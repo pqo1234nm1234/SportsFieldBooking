@@ -1,8 +1,7 @@
 const {createClient}=window.supabase;
 const configured=()=>!window.SUPABASE_URL.includes("PUT_YOUR")&&!window.SUPABASE_ANON_KEY.includes("PUT_YOUR");
 const db=()=>createClient(window.SUPABASE_URL,window.SUPABASE_ANON_KEY);
-let sb=null,state={page:"login",user:null,profile:null,fields:[],field:null,date:new Date().toISOString().slice(0,10),start:"18:00",end:"20:00",pay:"Card",available:null};
-
+let sb=null,state={page:"login",user:null,profile:null,fields:[],field:null,date:new Date().toISOString().slice(0,10),start:"",end:"",pay:"Card",available:null};
 const app=document.querySelector("#app");
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 const money=x=>`${Number(x).toFixed(2)} ج.م`;
