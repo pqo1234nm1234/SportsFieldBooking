@@ -1613,6 +1613,82 @@ async function managerDashboard(){
 
   `);
 }
+async function customerDashboard(){
+
+  const {data:fields,error}=await sb
+    .from("sports_fields")
+    .select("*")
+    .order("field_id",{ascending:true});
+
+  if(error){
+    return shell(`
+      <h1 class="title">الرئيسية</h1>
+      <section class="section">
+        <p>${esc(error.message)}</p>
+      </section>
+    `);
+  }
+
+  return shell(`
+    <h1 class="title">الرئيسية</h1>
+
+    <section class="section">
+
+      <h2 style="margin-bottom:10px">
+        مرحباً ${esc(state.profile?.full_name || state.user.email)}
+      </h2>
+
+      <p style="margin-bottom:25px">
+        اختر الملعب المناسب واحجز موعدك بسهولة.
+      </p>
+
+      <h2 class="title" style="font-size:24px">
+        الملاعب المتاحة
+      </h2>
+
+      <div class="grid">
+
+        ${(fields||[]).map(f=>`
+
+          <div class="card">
+
+            ${
+              f.image_url
+              ? `<img src="${esc(f.image_url)}"
+                    style="width:100%;height:180px;object-fit:cover;border-radius:10px">`
+              : ""
+            }
+
+            <h2>${esc(f.field_name || "ملعب")}</h2>
+
+            <p>
+              ${esc(f.field_type || "")}
+            </p>
+
+            <p class="price">
+              ${Number(f.price||0).toFixed(2)} ج.م / ساعة
+            </p>
+
+            <button
+              class="btn primary"
+              onclick="state.field=${JSON.stringify(f)};go('booking')">
+              احجز الآن
+            </button>
+
+          </div>
+
+        `).join("")}
+
+      </div>
+
+    </section>
+  `);
+}
+
+
+
+
+
 
 async function bookings(){
 
@@ -1739,10 +1815,6 @@ async function profile(){
 
 async function render(){
 
-  /* =========================
-     CONFIG
-     ========================= */
-
   if(!configured()){
     app.innerHTML=auth("login")
       .replace(
@@ -1752,27 +1824,15 @@ async function render(){
     return;
   }
 
-  /* =========================
-     LOGIN
-     ========================= */
-
   if(state.page==="login"){
     app.innerHTML=auth("login");
     return;
   }
 
-  /* =========================
-     SIGN UP
-     ========================= */
-
   if(state.page==="signup"){
     app.innerHTML=auth("signup");
     return;
   }
-
-  /* =========================
-     NO USER
-     ========================= */
 
   if(!state.user){
     state.page="login";
@@ -1780,107 +1840,65 @@ async function render(){
     return;
   }
 
-  /* =========================
-     ROLE
-     ========================= */
-
   const isManager = state.profile?.role === "manager";
 
-
-  /* =====================================================
-     MANAGER
-     المدير له صفحات المدير فقط
-     ===================================================== */
+  /* =========================
+     المدير
+     ========================= */
 
   if(isManager){
 
-    const managerPages = [
-      "manager"
-    ];
-
-    if(!managerPages.includes(state.page)){
+    if(state.page !== "manager"){
       state.page="manager";
     }
 
     app.innerHTML=await managerDashboard();
-
     return;
   }
-
-
-  /* =====================================================
-     CUSTOMER
-     المستخدم له صفحات المستخدم فقط
-     ===================================================== */
-
-  if(state.page==="manager"){
-
-    state.page="dashboard";
-
-    app.innerHTML=await dashboard();
-
-    return;
-  }
-
 
   /* =========================
-     CUSTOMER PAGES
+     المستخدم العادي
      ========================= */
 
+  if(state.page==="manager"){
+    state.page="dashboard";
+  }
+
   if(state.page==="dashboard"){
-
-    app.innerHTML=await dashboard();
-
+    app.innerHTML=await customerDashboard();
   }
 
   else if(state.page==="fields"){
-
     app.innerHTML=fieldsPage();
-
   }
 
   else if(state.page==="booking"){
-
     app.innerHTML=booking();
-
   }
 
   else if(state.page==="availability"){
-
     app.innerHTML=availability();
-
   }
 
   else if(state.page==="payment"){
-
     app.innerHTML=payment();
-
   }
 
   else if(state.page==="success"){
-
     app.innerHTML=success();
-
   }
 
   else if(state.page==="bookings"){
-
     app.innerHTML=await bookings();
-
   }
 
   else if(state.page==="profile"){
-
     app.innerHTML=await profile();
-
   }
 
   else{
-
     state.page="dashboard";
-
-    app.innerHTML=await dashboard();
-
+    app.innerHTML=await customerDashboard();
   }
 }
 
