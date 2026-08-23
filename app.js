@@ -115,12 +115,101 @@ async function bookings(){
   if(error)
     return shell(`<section class="section"><p>${esc(error.message)}</p></section>`);
 
-  const rows=(data||[]);
+  const rows=data||[];
 
-  const formatId=(id,date)=>{
-    const d=String(date||"").replaceAll("-","");
-    return `BK${d}${String(id).padStart(3,"0")}`;
-  };
+  const upcoming=rows.filter(b=>b.booking_status==="Confirmed" || b.booking_status==="Pending");
+  const completed=rows.filter(b=>b.booking_status==="Completed");
+  const cancelled=rows.filter(b=>b.booking_status==="Cancelled");
+
+  function statusBadge(status){
+    if(status==="Confirmed")
+      return `<span class="badge ok">مؤكد</span>`;
+    if(status==="Pending")
+      return `<span class="badge" style="background:#fff3cd;color:#856404">معلق</span>`;
+    if(status==="Cancelled")
+      return `<span class="badge" style="background:#f8d7da;color:#842029">ملغي</span>`;
+    if(status==="Completed")
+      return `<span class="badge ok">مكتمل</span>`;
+    return `<span class="badge">${esc(status)}</span>`;
+  }
+
+  function table(list){
+    return `
+      <div style="overflow:auto">
+        <table class="table">
+          <tr>
+            <th>رقم الحجز</th>
+            <th>الملعب</th>
+            <th>التاريخ</th>
+            <th>الوقت</th>
+            <th>السعر</th>
+            <th>الحالة</th>
+            <th>الإجراءات</th>
+          </tr>
+
+          ${
+            list.map(b=>`
+              <tr>
+                <td>BK${b.booking_id}</td>
+                <td>${esc(b.sports_fields?.field_name||"غير محدد")}</td>
+                <td>${b.booking_date}</td>
+                <td>${b.start_time} - ${b.end_time}</td>
+                <td>${Number(b.sports_fields?.price||0).toFixed(2)} ج.م</td>
+                <td>${statusBadge(b.booking_status)}</td>
+                <td>
+                  <button class="btn" onclick="go('booking')">عرض</button>
+                </td>
+              </tr>
+            `).join("")
+            || `<tr><td colspan="7" style="text-align:center;padding:25px">لا توجد حجوزات.</td></tr>`
+          }
+        </table>
+      </div>
+    `;
+  }
+
+  return shell(`
+    <h1 class="title">حجوزاتي</h1>
+
+    <section class="section">
+
+      <div style="
+        display:flex;
+        justify-content:center;
+        gap:10px;
+        border-bottom:1px solid #ddd;
+        margin-bottom:20px;
+        flex-wrap:wrap;
+      ">
+        <button class="btn primary" onclick="
+          document.getElementById('bookingTable').innerHTML=
+          \`${table(upcoming)}\`
+        ">
+          القادمة
+        </button>
+
+        <button class="btn" onclick="
+          document.getElementById('bookingTable').innerHTML=
+          \`${table(completed)}\`
+        ">
+          المكتملة
+        </button>
+
+        <button class="btn" onclick="
+          document.getElementById('bookingTable').innerHTML=
+          \`${table(cancelled)}\`
+        ">
+          الملغاة
+        </button>
+      </div>
+
+      <div id="bookingTable">
+        ${table(upcoming)}
+      </div>
+
+    </section>
+  `);
+}
 
   const statusText={
     Confirmed:"مؤكد",
