@@ -4404,12 +4404,8 @@ async function render(){
 
    else if(state.page==="receptionistBookings"){
 
-  app.innerHTML = `
-    <div style="padding:50px;text-align:center;direction:rtl">
-      <h1>📅 صفحة الحجوزات</h1>
-      <p>التنقل شغال ✅</p>
-    </div>
-  `;
+  app.innerHTML =
+    await receptionistBookings();
 
 }
 
