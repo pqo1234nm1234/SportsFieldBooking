@@ -1739,6 +1739,10 @@ async function profile(){
 
 async function render(){
 
+  /* =========================
+     CONFIG
+     ========================= */
+
   if(!configured()){
     app.innerHTML=auth("login")
       .replace(
@@ -1748,15 +1752,27 @@ async function render(){
     return;
   }
 
+  /* =========================
+     LOGIN
+     ========================= */
+
   if(state.page==="login"){
     app.innerHTML=auth("login");
     return;
   }
 
+  /* =========================
+     SIGN UP
+     ========================= */
+
   if(state.page==="signup"){
     app.innerHTML=auth("signup");
     return;
   }
+
+  /* =========================
+     NO USER
+     ========================= */
 
   if(!state.user){
     state.page="login";
@@ -1765,76 +1781,107 @@ async function render(){
   }
 
   /* =========================
-     MANAGER AREA
+     ROLE
      ========================= */
 
-  if(state.page==="manager"){
+  const isManager = state.profile?.role === "manager";
 
-    if(state.profile?.role==="manager"){
-      app.innerHTML=await managerDashboard();
-    }else{
-      state.page="dashboard";
-      app.innerHTML=await dashboard();
+
+  /* =====================================================
+     MANAGER
+     المدير له صفحات المدير فقط
+     ===================================================== */
+
+  if(isManager){
+
+    const managerPages = [
+      "manager"
+    ];
+
+    if(!managerPages.includes(state.page)){
+      state.page="manager";
     }
+
+    app.innerHTML=await managerDashboard();
 
     return;
   }
 
+
+  /* =====================================================
+     CUSTOMER
+     المستخدم له صفحات المستخدم فقط
+     ===================================================== */
+
+  if(state.page==="manager"){
+
+    state.page="dashboard";
+
+    app.innerHTML=await dashboard();
+
+    return;
+  }
+
+
   /* =========================
-     CUSTOMER AREA
+     CUSTOMER PAGES
      ========================= */
 
-  if(state.profile?.role==="manager"){
+  if(state.page==="dashboard"){
 
-    /*
-      لو المدير حاول يفتح صفحة من صفحات العميل
-      يرجعه تلقائياً إلى لوحة المدير
-    */
-
-    const customerPages=[
-      "dashboard",
-      "bookings",
-      "payment",
-      "profile",
-      "availability",
-      "success",
-      "booking"
-    ];
-
-    if(customerPages.includes(state.page)){
-      state.page="manager";
-      app.innerHTML=await managerDashboard();
-      return;
-    }
+    app.innerHTML=await dashboard();
 
   }
 
-  if(state.page==="dashboard")
-    app.innerHTML=await dashboard();
+  else if(state.page==="fields"){
 
-  else if(state.page==="fields")
     app.innerHTML=fieldsPage();
 
-  else if(state.page==="booking")
+  }
+
+  else if(state.page==="booking"){
+
     app.innerHTML=booking();
 
-  else if(state.page==="availability")
+  }
+
+  else if(state.page==="availability"){
+
     app.innerHTML=availability();
 
-  else if(state.page==="payment")
+  }
+
+  else if(state.page==="payment"){
+
     app.innerHTML=payment();
 
-  else if(state.page==="success")
+  }
+
+  else if(state.page==="success"){
+
     app.innerHTML=success();
 
-  else if(state.page==="bookings")
+  }
+
+  else if(state.page==="bookings"){
+
     app.innerHTML=await bookings();
 
-  else if(state.page==="profile")
+  }
+
+  else if(state.page==="profile"){
+
     app.innerHTML=await profile();
 
-  else
+  }
+
+  else{
+
+    state.page="dashboard";
+
     app.innerHTML=await dashboard();
+
+  }
 }
 
 init();
