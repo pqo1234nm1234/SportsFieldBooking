@@ -106,9 +106,110 @@ async function createBooking(){
 function payment(){const f=state.field;return shell(`<h1 class="title">شاشة الدفع</h1><div class="payment"><section class="section"><h2>ملخص الحجز</h2><div class="info"><div><b>الملعب</b><span>${esc(f.field_name)}</span></div><div><b>التاريخ</b><span>${state.date}</span></div><div><b>الوقت</b><span>${state.start} إلى ${state.end}</span></div></div></section><section class="section"><h2>طريقة الدفع</h2>${["Card","Cash","Wallet","Vodafone Cash"].map((m,i)=>`<label class="method"><input type="radio" name="pay" ${i===0?"checked":""} onchange="state.pay='${m}'"> ${m}</label>`).join("")}</section></div><section class="section"><div class="alert">🔒 واجهة دفع تجريبية للمشروع — يتم حفظ عملية الدفع في جدول PAYMENT.</div><button class="btn primary full" onclick="createBooking()">إتمام الدفع</button></section>`)}
 function success(){return shell(`<h1 class="title">شاشة تأكيد الحجز</h1><section class="section success"><div class="check">✓</div><h1 class="price">تم تأكيد الحجز بنجاح!</h1><p>تم حفظ الحجز والدفع في قاعدة البيانات.</p><div class="row"><button class="btn outline" onclick="go('dashboard')">العودة إلى الرئيسية</button><button class="btn primary" onclick="go('bookings')">عرض حجوزاتي</button></div></section>`)}
 async function bookings(){
- const {data,error}=await sb.from("bookings").select("booking_id,booking_date,start_time,end_time,booking_status,sports_fields(field_name,price)").eq("customer_id",state.user.id).order("booking_date",{ascending:false});
- if(error)return shell(`<section class="section"><p>${esc(error.message)}</p></section>`);
- return shell(`<h1 class="title">حجوزاتي</h1><section class="section"><div style="overflow:auto"><table class="table"><tr><th>رقم الحجز</th><th>الملعب</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th></tr>${(data||[]).map(b=>`<tr><td>${b.booking_id}</td><td>${esc(b.sports_fields?.field_name)}</td><td>${b.booking_date}</td><td>${b.start_time} - ${b.end_time}</td><td><span class="badge ok">${b.booking_status}</span></td></tr>`).join("")||"<tr><td colspan='5'>لا توجد حجوزات.</td></tr>"}</table></div></section>`)
+  const {data,error}=await sb
+    .from("bookings")
+    .select("booking_id,booking_date,start_time,end_time,booking_status,sports_fields(field_name,price)")
+    .eq("customer_id",state.user.id)
+    .order("booking_date",{ascending:false});
+
+  if(error)
+    return shell(`<section class="section"><p>${esc(error.message)}</p></section>`);
+
+  const rows=(data||[]);
+
+  const formatId=(id,date)=>{
+    const d=String(date||"").replaceAll("-","");
+    return `BK${d}${String(id).padStart(3,"0")}`;
+  };
+
+  const statusText={
+    Confirmed:"مؤكد",
+    Pending:"معلق",
+    Cancelled:"ملغي"
+  };
+
+  const statusClass={
+    Confirmed:"ok",
+    Pending:"pending",
+    Cancelled:"bad"
+  };
+
+  const table=(arr)=>`
+    <div style="overflow:auto">
+      <table class="table">
+        <tr>
+          <th>رقم الحجز</th>
+          <th>الملعب</th>
+          <th>التاريخ</th>
+          <th>الوقت</th>
+          <th>السعر</th>
+          <th>الحالة</th>
+          <th>الإجراءات</th>
+        </tr>
+
+        ${
+          arr.map(b=>`
+            <tr>
+              <td><b>${formatId(b.booking_id,b.booking_date)}</b></td>
+              <td>${esc(b.sports_fields?.field_name||"-")}</td>
+              <td>${b.booking_date}</td>
+              <td>${b.start_time} - ${b.end_time}</td>
+              <td>${money(b.sports_fields?.price||0)}</td>
+              <td>
+                <span class="badge ${statusClass[b.booking_status]||""}">
+                  ${statusText[b.booking_status]||b.booking_status}
+                </span>
+              </td>
+              <td>
+                <button class="btn outline"
+                  onclick='alert("الحجز: ${formatId(b.booking_id,b.booking_date)}\\nالملعب: ${String(b.sports_fields?.field_name||"-").replace(/"/g,"")}\\nالتاريخ: ${b.booking_date}\\nالوقت: ${b.start_time} - ${b.end_time}")'>
+                  عرض 👁
+                </button>
+              </td>
+            </tr>
+          `).join("")
+          ||
+          `<tr><td colspan="7">لا توجد حجوزات.</td></tr>`
+        }
+      </table>
+    </div>
+  `;
+
+  const upcoming=rows.filter(b=>b.booking_status==="Confirmed");
+  const completed=rows.filter(b=>b.booking_status==="Pending");
+  const cancelled=rows.filter(b=>b.booking_status==="Cancelled");
+
+  return shell(`
+    <h1 class="title">حجوزاتي</h1>
+
+    <section class="section">
+
+      <div class="row" style="justify-content:center;gap:10px;margin-bottom:20px">
+        <button class="btn primary" onclick="document.querySelector('#bookingTable').innerHTML=window.__bookUpcoming">
+          القادمة
+        </button>
+
+        <button class="btn outline" onclick="document.querySelector('#bookingTable').innerHTML=window.__bookCompleted">
+          المكتملة
+        </button>
+
+        <button class="btn outline" onclick="document.querySelector('#bookingTable').innerHTML=window.__bookCancelled">
+          الملغاة
+        </button>
+      </div>
+
+      <div id="bookingTable">
+        ${table(upcoming)}
+      </div>
+
+    </section>
+
+    <script>
+      window.__bookUpcoming=${JSON.stringify(table(upcoming))};
+      window.__bookCompleted=${JSON.stringify(table(completed))};
+      window.__bookCancelled=${JSON.stringify(table(cancelled))};
+    </script>
+  `);
 }
 async function profile(){
  return shell(`<h1 class="title">الملف الشخصي</h1><section class="section"><h2>بيانات الحساب</h2><p><b>الاسم:</b> ${esc(state.profile?.full_name)}</p><p><b>البريد:</b> ${esc(state.user.email)}</p><p><b>الهاتف:</b> ${esc(state.profile?.phone||"غير مضاف")}</p></section>`)
