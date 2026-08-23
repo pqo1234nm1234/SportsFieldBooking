@@ -253,44 +253,92 @@ function auth(mode){
 
 function side(){
 
-  const isManager=state.profile?.role==="manager";
+  const isManager = state.profile?.role === "manager";
 
-  const menu=isManager
-    ? [
-        ["manager","لوحة المدير"],
-        ["fields","الملاعب"]
-      ]
-    : [
-        ["dashboard","الرئيسية"],
-        ["fields","الملاعب"],
-        ["bookings","حجوزاتي"],
-        ["payment","المدفوعات"],
-        ["profile","الملف الشخصي"]
-      ];
+  /* =========================
+     MANAGER SIDEBAR
+     ========================= */
+  if(isManager){
+    return `
+      <aside class="side">
 
+        <div class="brand">
+          <span class="ball">⚽</span>
+          <span>نظام حجز الملاعب</span>
+        </div>
+
+        <nav class="nav">
+
+          <button class="${state.page==="manager" ? "active" : ""}"
+            onclick="go('manager')">
+            🏠 لوحة المدير
+          </button>
+
+          <button class="${state.page==="bookings" ? "active" : ""}"
+            onclick="go('bookings')">
+            📅 الحجوزات
+          </button>
+
+          <button class="${state.page==="fields" ? "active" : ""}"
+            onclick="go('fields')">
+            ⚽ الملاعب
+          </button>
+
+          <button class="${state.page==="profile" ? "active" : ""}"
+            onclick="go('profile')">
+            👥 العملاء
+          </button>
+
+          <button onclick="logout()">
+            🚪 تسجيل الخروج
+          </button>
+
+        </nav>
+
+      </aside>
+    `;
+  }
+
+  /* =========================
+     CUSTOMER SIDEBAR
+     ========================= */
   return `
     <aside class="side">
 
       <div class="brand">
         <span class="ball">⚽</span>
-        <span>نظام حجز<br>الملاعب</span>
+        <span>نظام حجز الملاعب</span>
       </div>
 
       <nav class="nav">
 
-        ${
-          menu.map(x=>`
-            <button
-              class="${state.page===x[0]?"active":""}"
-              onclick="go('${x[0]}')"
-            >
-              ${x[1]}
-            </button>
-          `).join("")
-        }
+        <button class="${state.page==="dashboard" ? "active" : ""}"
+          onclick="go('dashboard')">
+          🏠 الرئيسية
+        </button>
+
+        <button class="${state.page==="fields" ? "active" : ""}"
+          onclick="go('fields')">
+          ⚽ الملاعب
+        </button>
+
+        <button class="${state.page==="bookings" ? "active" : ""}"
+          onclick="go('bookings')">
+          📅 حجوزاتي
+        </button>
+
+        <button class="${state.page==="payment" ? "active" : ""}"
+          onclick="go('payment')">
+          💳 وسائل الدفع
+        </button>
+
+        <button class="${state.page==="profile" ? "active" : ""}"
+          onclick="go('profile')">
+          👤 الملف الشخصي
+        </button>
 
         <button onclick="logout()">
-          تسجيل الخروج
+          🚪 تسجيل الخروج
         </button>
 
       </nav>
@@ -379,7 +427,10 @@ async function selectField(id){
 
 async function dashboard(){
 
-  const {data:bookingsData,error:bookingsError}=await sb
+  /* =========================
+     GET USER BOOKINGS
+     ========================= */
+  const { data: bookingsData } = await sb
     .from("bookings")
     .select(`
       booking_id,
@@ -387,446 +438,288 @@ async function dashboard(){
       start_time,
       end_time,
       booking_status,
-      field_id,
-      sports_fields(field_name,price)
+      sports_fields (
+        field_name,
+        price
+      )
     `)
-    .eq("customer_id",state.user.id)
-    .order("booking_date",{ascending:false});
+    .eq("customer_id", state.user.id)
+    .order("booking_date", { ascending: false });
 
-  if(bookingsError){
-    return shell(`
-      <h1 class="title">الرئيسية</h1>
+  const bookings = bookingsData || [];
 
-      <section class="section">
-        <p>${esc(bookingsError.message)}</p>
-      </section>
-    `);
-  }
+  /* =========================
+     STATISTICS
+     ========================= */
 
-  const rows=bookingsData||[];
+  const upcoming = bookings.filter(
+    b => b.booking_status === "Confirmed"
+  ).length;
 
-  const bookingIds=rows.map(b=>b.booking_id);
+  const completed = bookings.filter(
+    b => b.booking_status === "Completed"
+  ).length;
 
-  let paymentsData=[];
+  const pending = bookings.filter(
+    b => b.booking_status === "Pending"
+  ).length;
 
-  if(bookingIds.length){
-
-    const {data}=await sb
-      .from("payments")
-      .select("booking_id,amount,payment_status")
-      .in("booking_id",bookingIds);
-
-    paymentsData=data||[];
-  }
-
-  const today=new Date().toISOString().slice(0,10);
-
-  const upcoming=rows.filter(b=>
-    b.booking_status==="Confirmed" &&
-    b.booking_date>=today
-  );
-
-  const completed=rows.filter(b=>
-    b.booking_status==="Confirmed" &&
-    b.booking_date<today
-  );
-
-  const pending=rows.filter(b=>
-    b.booking_status==="Pending"
-  );
-
-  const cancelled=rows.filter(b=>
-    b.booking_status==="Cancelled"
-  );
-
-  const totalPayments=paymentsData
-    .filter(p=>p.payment_status==="Paid")
+  const totalPaid = bookings
+    .filter(b =>
+      b.booking_status === "Confirmed" ||
+      b.booking_status === "Completed"
+    )
     .reduce(
-      (sum,p)=>sum+Number(p.amount||0),
+      (sum, b) => sum + Number(b.sports_fields?.price || 0),
       0
     );
 
-  const pendingPayments=paymentsData
-    .filter(p=>p.payment_status==="Pending")
-    .reduce(
-      (sum,p)=>sum+Number(p.amount||0),
-      0
-    );
+  /* =========================
+     GET SPORTS FIELDS
+     ========================= */
 
-  const fieldMap={};
+  const { data: fieldsData } = await sb
+    .from("sports_fields")
+    .select("*");
 
-  rows.forEach(b=>{
-    const name=b.sports_fields?.field_name||"غير محدد";
+  const fields = fieldsData || [];
 
-    if(!fieldMap[name])
-      fieldMap[name]=0;
+  /* =========================
+     FIELD IMAGE
+     ========================= */
 
-    fieldMap[name]++;
-  });
+  function fieldImage(field){
 
-  const fieldCounts=Object.entries(fieldMap)
-    .sort((a,b)=>b[1]-a[1])
-    .slice(0,4);
+    const name = String(
+      field.field_name ||
+      field.name ||
+      ""
+    ).toLowerCase();
 
-  const maxFieldCount=Math.max(
-    ...fieldCounts.map(x=>x[1]),
-    1
-  );
+    /* لو عندك رابط صورة في قاعدة البيانات */
+    if(field.image_url) return field.image_url;
+    if(field.image) return field.image;
+    if(field.photo_url) return field.photo_url;
+    if(field.image_path) return field.image_path;
 
-  const recent=rows.slice(0,5);
+    /* صور افتراضية */
+    if(name.includes("قدم") || name.includes("football")){
+      return "assets/football.jpg";
+    }
+
+    if(name.includes("سلة") || name.includes("basket")){
+      return "assets/basketball.jpg";
+    }
+
+    if(name.includes("تنس") || name.includes("tennis")){
+      return "assets/tennis.jpg";
+    }
+
+    return "assets/football.jpg";
+  }
+
+  /* =========================
+     FIELD CARD
+     ========================= */
+
+  function fieldCard(field){
+
+    const fieldName =
+      field.field_name ||
+      field.name ||
+      "ملعب";
+
+    const type =
+      field.field_type ||
+      field.type ||
+      "خارجي";
+
+    const price =
+      Number(field.price || 0).toFixed(0);
+
+    return `
+      <div class="field-card">
+
+        <div class="field-image">
+          <img
+            src="${fieldImage(field)}"
+            alt="${esc(fieldName)}"
+            onerror="this.src='assets/football.jpg'"
+          >
+        </div>
+
+        <div class="field-card-body">
+
+          <h3>
+            ${esc(fieldName)}
+          </h3>
+
+          <p class="field-type">
+            ${esc(type)}
+          </p>
+
+          <div class="field-bottom">
+
+            <strong>
+              ${price} ج.م / ساعة
+            </strong>
+
+            <button
+              class="book-icon"
+              onclick="go('booking')"
+              title="احجز الآن">
+              📅
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+    `;
+  }
+
+  /* =========================
+     DASHBOARD
+     ========================= */
 
   return shell(`
 
     <h1 class="title">
-      لوحة التحكم
+      لوحة تحكم العميل (الرئيسية)
     </h1>
 
-    <div class="grid4">
+    <section class="customer-welcome">
 
-      ${stat(
-        upcoming.length,
-        "حجوزات قادمة"
-      )}
-
-      ${stat(
-        completed.length,
-        "حجوزات مكتملة"
-      )}
-
-      ${stat(
-        pending.length,
-        "حجوزات قيد الانتظار"
-      )}
-
-      ${stat(
-        cancelled.length,
-        "حجوزات ملغاة"
-      )}
-
-    </div>
-
-
-    <div class="grid4" style="margin-top:18px">
-
-      ${stat(
-        money(totalPayments),
-        "إجمالي المدفوعات"
-      )}
-
-      ${stat(
-        money(pendingPayments),
-        "مدفوعات معلقة"
-      )}
-
-      ${stat(
-        rows.length,
-        "إجمالي الحجوزات"
-      )}
-
-      ${stat(
-        state.fields.length,
-        "الملاعب المتاحة"
-      )}
-
-    </div>
-
-
-    <div
-      class="grid2"
-      style="margin-top:18px"
-    >
-
-      <section class="section">
-
-        <div class="row">
-          <h2>ملخص الحجوزات</h2>
-        </div>
-
-        <div
-          style="
-            display:grid;
-            grid-template-columns:repeat(4,1fr);
-            gap:12px;
-            margin-top:20px;
-          "
-        >
-
-          <div
-            style="
-              text-align:center;
-              padding:18px;
-              border-radius:12px;
-              background:#eef8f0;
-            "
-          >
-            <div style="font-size:28px;font-weight:bold">
-              ${upcoming.length}
-            </div>
-            <div>القادمة</div>
-          </div>
-
-          <div
-            style="
-              text-align:center;
-              padding:18px;
-              border-radius:12px;
-              background:#eef5fb;
-            "
-          >
-            <div style="font-size:28px;font-weight:bold">
-              ${completed.length}
-            </div>
-            <div>المكتملة</div>
-          </div>
-
-          <div
-            style="
-              text-align:center;
-              padding:18px;
-              border-radius:12px;
-              background:#fff8e6;
-            "
-          >
-            <div style="font-size:28px;font-weight:bold">
-              ${pending.length}
-            </div>
-            <div>قيد الانتظار</div>
-          </div>
-
-          <div
-            style="
-              text-align:center;
-              padding:18px;
-              border-radius:12px;
-              background:#fff0f0;
-            "
-          >
-            <div style="font-size:28px;font-weight:bold">
-              ${cancelled.length}
-            </div>
-            <div>ملغاة</div>
-          </div>
-
-        </div>
-
-      </section>
-
-
-      <section class="section">
-
+      <div>
         <h2>
-          أكثر الملاعب حجزاً
+          مرحباً، ${esc(
+            state.profile?.full_name ||
+            state.user?.email ||
+            "عميل"
+          )}
         </h2>
 
-        ${
-          fieldCounts.length
-          ?
-          fieldCounts.map(([name,count])=>`
+        <p>
+          ماذا ستلعب اليوم؟
+        </p>
+      </div>
 
-            <div style="margin-top:22px">
+      <div class="customer-avatar">
+        👤
+      </div>
 
-              <div
-                style="
-                  display:flex;
-                  justify-content:space-between;
-                  margin-bottom:8px;
-                "
-              >
-                <b>${esc(name)}</b>
-                <span>${count}</span>
-              </div>
-
-              <div
-                style="
-                  height:10px;
-                  background:#eee;
-                  border-radius:10px;
-                  overflow:hidden;
-                "
-              >
-
-                <div
-                  style="
-                    width:${(count/maxFieldCount)*100}%;
-                    height:100%;
-                    background:#27ae60;
-                    border-radius:10px;
-                  "
-                ></div>
-
-              </div>
-
-            </div>
-
-          `).join("")
-          :
-          `<p class="muted">لا توجد حجوزات حتى الآن.</p>`
-        }
-
-      </section>
-
-    </div>
+    </section>
 
 
-    <section
-      class="section"
-      style="margin-top:18px"
-    >
+    <!-- =========================
+         STATISTICS
+         ========================= -->
 
-      <div class="row">
+    <section class="customer-stats">
 
-        <h2>
-          الملاعب المتاحة
-        </h2>
+      <div class="customer-stat">
 
-        <button
-          class="btn outline"
-          onclick="go('fields')"
-        >
-          عرض الكل
-        </button>
+        <div class="stat-icon blue">
+          📅
+        </div>
+
+        <div class="stat-number">
+          ${upcoming}
+        </div>
+
+        <div class="stat-label">
+          حجوزات قادمة
+        </div>
 
       </div>
 
-      <div class="grid3">
 
-        ${
-          state.fields
-            .slice(0,3)
-            .map(card)
-            .join("")
-          ||
-          "<p>لا توجد ملاعب بعد.</p>"
-        }
+      <div class="customer-stat">
+
+        <div class="stat-icon green">
+          ✓
+        </div>
+
+        <div class="stat-number">
+          ${completed}
+        </div>
+
+        <div class="stat-label">
+          حجوزات مكتملة
+        </div>
+
+      </div>
+
+
+      <div class="customer-stat">
+
+        <div class="stat-icon wallet">
+          💳
+        </div>
+
+        <div class="stat-number">
+          ${totalPaid.toFixed(2)} ج.م
+        </div>
+
+        <div class="stat-label">
+          إجمالي المدفوعات
+        </div>
+
+      </div>
+
+
+      <div class="customer-stat">
+
+        <div class="stat-icon orange">
+          🕐
+        </div>
+
+        <div class="stat-number">
+          ${pending}
+        </div>
+
+        <div class="stat-label">
+          مدفوعات معلقة
+        </div>
 
       </div>
 
     </section>
 
 
-    <section
-      class="section"
-      style="margin-top:18px"
-    >
+    <!-- =========================
+         AVAILABLE FIELDS
+         ========================= -->
 
-      <div class="row">
+    <section class="customer-fields-section">
+
+      <div class="section-heading">
 
         <h2>
-          أحدث الحجوزات
+          الملاعب المتاحة
         </h2>
 
         <button
-          class="btn outline"
-          onclick="go('bookings')"
-        >
+          class="show-all-btn"
+          onclick="go('fields')">
           عرض الكل
         </button>
 
       </div>
 
 
-      <div style="overflow:auto">
+      <div class="customer-fields-grid">
 
-        <table class="table">
-
-          <tr>
-            <th>رقم الحجز</th>
-            <th>الملعب</th>
-            <th>التاريخ</th>
-            <th>الوقت</th>
-            <th>السعر</th>
-            <th>الحالة</th>
-          </tr>
-
-          ${
-            recent.length
-            ?
-            recent.map(b=>`
-
-              <tr>
-
-                <td>
-                  <b>
-                    BK${String(
-                      b.booking_id
-                    ).padStart(6,"0")}
-                  </b>
-                </td>
-
-                <td>
-                  ${esc(
-                    b.sports_fields?.field_name||
-                    "غير محدد"
-                  )}
-                </td>
-
-                <td>
-                  ${b.booking_date}
-                </td>
-
-                <td>
-                  ${b.start_time} -
-                  ${b.end_time}
-                </td>
-
-                <td>
-                  ${money(
-                    b.sports_fields?.price||0
-                  )}
-                </td>
-
-                <td>
-
-                  ${
-                    b.booking_status==="Confirmed"
-                    ?
-                    `<span class="badge ok">مؤكد</span>`
-                    :
-                    b.booking_status==="Pending"
-                    ?
-                    `<span
-                      class="badge"
-                      style="
-                        background:#fff3cd;
-                        color:#856404
-                      "
-                    >
-                      معلق
-                    </span>`
-                    :
-                    `<span
-                      class="badge"
-                      style="
-                        background:#f8d7da;
-                        color:#842029
-                      "
-                    >
-                      ملغي
-                    </span>`
-                  }
-
-                </td>
-
-              </tr>
-
-            `).join("")
-            :
+        ${
+          fields.length
+            ? fields.slice(0, 3).map(fieldCard).join("")
+            : `
+              <div class="empty-fields">
+                لا توجد ملاعب متاحة حالياً.
+              </div>
             `
-              <tr>
-                <td
-                  colspan="6"
-                  style="
-                    text-align:center;
-                    padding:25px
-                  "
-                >
-                  لا توجد حجوزات حتى الآن.
-                </td>
-              </tr>
-            `
-          }
-
-        </table>
+        }
 
       </div>
 
@@ -834,7 +727,6 @@ async function dashboard(){
 
   `);
 }
-
 
 function fieldsPage(){
   return shell(`
