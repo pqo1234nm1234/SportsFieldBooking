@@ -3173,6 +3173,1157 @@ async function deleteUserPaymentMethod(id){
   await render();
 }
 
+
+async function receptionistDashboard(){
+
+  const today = new Date()
+    .toISOString()
+    .slice(0,10);
+
+  const { data: bookings, error } = await sb
+    .from("bookings")
+    .select("*")
+    .eq("booking_date", today)
+    .order("start_time", { ascending:true });
+
+  if(error){
+    return shell(`
+      <h1 class="title">لوحة الاستقبال</h1>
+
+      <section class="section">
+        <p class="notice error">
+          ${esc(error.message)}
+        </p>
+      </section>
+    `);
+  }
+
+  const list = bookings || [];
+
+  const confirmed =
+    list.filter(b =>
+      String(b.booking_status).toLowerCase() === "confirmed"
+    ).length;
+
+  const pending =
+    list.filter(b =>
+      String(b.booking_status).toLowerCase() === "pending"
+    ).length;
+
+  const cancelled =
+    list.filter(b =>
+      String(b.booking_status).toLowerCase() === "cancelled"
+    ).length;
+
+
+  return shell(`
+
+    <div style="
+      direction:rtl;
+      text-align:right;
+    ">
+
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        margin-bottom:25px;
+      ">
+
+        <div>
+          <h1 class="title" style="margin-bottom:6px;">
+            لوحة الاستقبال
+          </h1>
+
+          <p class="muted">
+            إدارة حجوزات اليوم ومتابعة حالة الملاعب
+          </p>
+        </div>
+
+        <div style="
+          background:#f3f7f5;
+          padding:12px 18px;
+          border-radius:12px;
+        ">
+          📅 ${today}
+        </div>
+
+      </div>
+
+
+      <!-- الإحصائيات -->
+
+      <div style="
+        display:grid;
+        grid-template-columns:
+          repeat(auto-fit,minmax(190px,1fr));
+        gap:16px;
+        margin-bottom:25px;
+      ">
+
+        <div class="section" style="margin:0;">
+          <div style="font-size:30px;">📅</div>
+          <div class="muted">حجوزات اليوم</div>
+          <h2 style="margin:5px 0 0;">
+            ${list.length}
+          </h2>
+        </div>
+
+
+        <div class="section" style="margin:0;">
+          <div style="font-size:30px;">🟢</div>
+          <div class="muted">حجوزات مؤكدة</div>
+          <h2 style="margin:5px 0 0;">
+            ${confirmed}
+          </h2>
+        </div>
+
+
+        <div class="section" style="margin:0;">
+          <div style="font-size:30px;">⏳</div>
+          <div class="muted">معلقة</div>
+          <h2 style="margin:5px 0 0;">
+            ${pending}
+          </h2>
+        </div>
+
+
+        <div class="section" style="margin:0;">
+          <div style="font-size:30px;">❌</div>
+          <div class="muted">ملغاة</div>
+          <h2 style="margin:5px 0 0;">
+            ${cancelled}
+          </h2>
+        </div>
+
+      </div>
+
+
+      <!-- اختصارات -->
+
+      <section class="section">
+
+        <h2>
+          الوصول السريع
+        </h2>
+
+        <div style="
+          display:grid;
+          grid-template-columns:
+            repeat(auto-fit,minmax(220px,1fr));
+          gap:15px;
+          margin-top:18px;
+        ">
+
+          <button
+            class="btn primary"
+            style="padding:22px;"
+            onclick="go('receptionistBookings')"
+          >
+            📅
+            <br>
+            إدارة الحجوزات
+          </button>
+
+
+          <button
+            class="btn"
+            style="padding:22px;"
+            onclick="go('receptionistAvailability')"
+          >
+            🏟️
+            <br>
+            توافر الملاعب
+          </button>
+
+        </div>
+
+      </section>
+
+
+      <!-- حجوزات اليوم -->
+
+      <section class="section">
+
+        <div style="
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+          margin-bottom:15px;
+        ">
+
+          <h2 style="margin:0;">
+            حجوزات اليوم
+          </h2>
+
+          <button
+            class="btn"
+            onclick="go('receptionistBookings')"
+          >
+            عرض الكل
+          </button>
+
+        </div>
+
+
+        ${
+          list.length === 0
+
+          ?
+
+          `
+          <div style="
+            text-align:center;
+            padding:40px;
+            color:#777;
+          ">
+            📭
+            <br><br>
+            لا توجد حجوزات اليوم
+          </div>
+          `
+
+          :
+
+          `
+          <div style="
+            overflow-x:auto;
+          ">
+
+            <table style="
+              width:100%;
+              border-collapse:collapse;
+              direction:rtl;
+            ">
+
+              <thead>
+
+                <tr>
+                  <th style="padding:12px;text-align:right;">
+                    الوقت
+                  </th>
+
+                  <th style="padding:12px;text-align:right;">
+                    الملعب
+                  </th>
+
+                  <th style="padding:12px;text-align:right;">
+                    الحالة
+                  </th>
+                </tr>
+
+              </thead>
+
+              <tbody>
+
+                ${list.slice(0,6).map(b => `
+
+                  <tr>
+
+                    <td style="padding:12px;">
+                      ${esc(b.start_time || "")}
+                      -
+                      ${esc(b.end_time || "")}
+                    </td>
+
+                    <td style="padding:12px;">
+                      ${esc(b.field_id || "-")}
+                    </td>
+
+                    <td style="padding:12px;">
+                      ${esc(b.booking_status || "-")}
+                    </td>
+
+                  </tr>
+
+                `).join("")}
+
+              </tbody>
+
+            </table>
+
+          </div>
+          `
+        }
+
+      </section>
+
+    </div>
+
+  `);
+}
+
+async function receptionistBookings(){
+
+  const { data: bookings, error } = await sb
+    .from("bookings")
+    .select("*")
+    .order("booking_date", { ascending:false })
+    .order("start_time", { ascending:true });
+
+  if(error){
+    return shell(`
+      <div style="direction:rtl;text-align:right">
+
+        <h1 class="title">
+          إدارة الحجوزات
+        </h1>
+
+        <section class="section">
+          <p class="notice error">
+            ${esc(error.message)}
+          </p>
+        </section>
+
+      </div>
+    `);
+  }
+
+  const list = bookings || [];
+
+
+  return shell(`
+
+    <div style="
+      direction:rtl;
+      text-align:right;
+    ">
+
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        margin-bottom:25px;
+        gap:15px;
+        flex-wrap:wrap;
+      ">
+
+        <div>
+
+          <h1 class="title" style="margin-bottom:6px;">
+            إدارة الحجوزات
+          </h1>
+
+          <p class="muted">
+            متابعة حجوزات العملاء وإدارة حالتها
+          </p>
+
+        </div>
+
+
+        <button
+          class="btn"
+          onclick="go('receptionist')"
+        >
+          ← لوحة الاستقبال
+        </button>
+
+      </div>
+
+
+      <!-- البحث -->
+
+      <section class="section">
+
+        <div style="
+          display:grid;
+          grid-template-columns:
+            minmax(200px,1fr)
+            minmax(160px,220px);
+          gap:12px;
+        ">
+
+          <input
+            id="receptionSearch"
+            class="input"
+            placeholder="🔍 ابحث في الحجوزات..."
+            oninput="filterReceptionBookings()"
+          >
+
+          <select
+            id="receptionStatus"
+            class="input"
+            onchange="filterReceptionBookings()"
+          >
+
+            <option value="">
+              كل الحالات
+            </option>
+
+            <option value="confirmed">
+              مؤكدة
+            </option>
+
+            <option value="pending">
+              معلقة
+            </option>
+
+            <option value="cancelled">
+              ملغاة
+            </option>
+
+          </select>
+
+        </div>
+
+      </section>
+
+
+      <!-- جدول الحجوزات -->
+
+      <section class="section">
+
+        <div style="
+          overflow-x:auto;
+        ">
+
+          <table
+            id="receptionBookingsTable"
+            style="
+              width:100%;
+              border-collapse:collapse;
+              direction:rtl;
+            "
+          >
+
+            <thead>
+
+              <tr>
+
+                <th style="padding:14px;text-align:right;">
+                  التاريخ
+                </th>
+
+                <th style="padding:14px;text-align:right;">
+                  الوقت
+                </th>
+
+                <th style="padding:14px;text-align:right;">
+                  الملعب
+                </th>
+
+                <th style="padding:14px;text-align:right;">
+                  العميل
+                </th>
+
+                <th style="padding:14px;text-align:right;">
+                  الحالة
+                </th>
+
+                <th style="padding:14px;text-align:right;">
+                  الإجراء
+                </th>
+
+              </tr>
+
+            </thead>
+
+
+            <tbody>
+
+              ${
+                list.length === 0
+
+                ?
+
+                `
+                <tr>
+
+                  <td
+                    colspan="6"
+                    style="
+                      text-align:center;
+                      padding:50px;
+                      color:#777;
+                    "
+                  >
+
+                    📭
+                    <br><br>
+
+                    لا توجد حجوزات
+
+                  </td>
+
+                </tr>
+                `
+
+                :
+
+                list.map(b => `
+
+                  <tr
+                    class="reception-booking-row"
+                    data-search="
+                      ${String(
+                        b.booking_date || ""
+                      ).toLowerCase()}
+
+                      ${String(
+                        b.booking_status || ""
+                      ).toLowerCase()}
+
+                      ${String(
+                        b.field_id || ""
+                      ).toLowerCase()}
+
+                      ${String(
+                        b.user_id || ""
+                      ).toLowerCase()}
+                    "
+                    data-status="
+                      ${String(
+                        b.booking_status || ""
+                      ).toLowerCase()}
+                    "
+                  >
+
+                    <td style="padding:14px;">
+                      ${esc(b.booking_date || "-")}
+                    </td>
+
+
+                    <td style="padding:14px;white-space:nowrap;">
+
+                      ${esc(b.start_time || "-")}
+
+                      <span style="
+                        margin:0 5px;
+                        color:#999;
+                      ">
+                        →
+                      </span>
+
+                      ${esc(b.end_time || "-")}
+
+                    </td>
+
+
+                    <td style="padding:14px;">
+                      ${esc(b.field_id || "-")}
+                    </td>
+
+
+                    <td style="padding:14px;">
+                      ${esc(b.user_id || "-")}
+                    </td>
+
+
+                    <td style="padding:14px;">
+
+                      ${
+                        String(b.booking_status).toLowerCase()
+                        === "confirmed"
+
+                        ?
+
+                        `<span style="
+                          background:#e8f7ee;
+                          color:#16834b;
+                          padding:6px 10px;
+                          border-radius:20px;
+                          font-size:13px;
+                        ">
+                          🟢 مؤكدة
+                        </span>`
+
+                        :
+
+                        String(b.booking_status).toLowerCase()
+                        === "cancelled"
+
+                        ?
+
+                        `<span style="
+                          background:#fdecec;
+                          color:#c62828;
+                          padding:6px 10px;
+                          border-radius:20px;
+                          font-size:13px;
+                        ">
+                          🔴 ملغاة
+                        </span>`
+
+                        :
+
+                        `<span style="
+                          background:#fff5df;
+                          color:#a66a00;
+                          padding:6px 10px;
+                          border-radius:20px;
+                          font-size:13px;
+                        ">
+                          ⏳ معلقة
+                        </span>`
+                      }
+
+                    </td>
+
+
+                    <td style="padding:14px;">
+
+                      <div style="
+                        display:flex;
+                        gap:7px;
+                        flex-wrap:wrap;
+                      ">
+
+                        ${
+                          String(
+                            b.booking_status
+                          ).toLowerCase() !== "confirmed"
+
+                          ?
+
+                          `
+                          <button
+                            class="btn"
+                            onclick="
+                              receptionistConfirmBooking(
+                                '${b.id}'
+                              )
+                            "
+                          >
+                            ✓ تأكيد
+                          </button>
+                          `
+
+                          :
+
+                          ""
+                        }
+
+
+                        ${
+                          String(
+                            b.booking_status
+                          ).toLowerCase() !== "cancelled"
+
+                          ?
+
+                          `
+                          <button
+                            class="btn"
+                            onclick="
+                              receptionistCancelBooking(
+                                '${b.id}'
+                              )
+                            "
+                          >
+                            إلغاء
+                          </button>
+                          `
+
+                          :
+
+                          ""
+                        }
+
+                      </div>
+
+                    </td>
+
+                  </tr>
+
+                `).join("")
+              }
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </section>
+
+    </div>
+
+  `);
+}
+function filterReceptionBookings(){
+
+  const search =
+    (
+      document.getElementById("receptionSearch")?.value
+      || ""
+    ).toLowerCase().trim();
+
+  const status =
+    (
+      document.getElementById("receptionStatus")?.value
+      || ""
+    ).toLowerCase();
+
+  document
+    .querySelectorAll(".reception-booking-row")
+    .forEach(row => {
+
+      const text =
+        row.dataset.search || "";
+
+      const rowStatus =
+        row.dataset.status || "";
+
+      const matchSearch =
+        !search ||
+        text.includes(search);
+
+      const matchStatus =
+        !status ||
+        rowStatus === status;
+
+      row.style.display =
+        matchSearch && matchStatus
+        ? ""
+        : "none";
+
+    });
+}
+
+
+async function receptionistConfirmBooking(id){
+
+  if(!confirm("تأكيد هذا الحجز؟"))
+    return;
+
+  const { error } = await sb
+    .from("bookings")
+    .update({
+      booking_status:"confirmed"
+    })
+    .eq("id",id);
+
+  if(error){
+
+    alert(error.message);
+    return;
+
+  }
+
+  state.page="receptionistBookings";
+
+  await render();
+}
+
+
+async function receptionistCancelBooking(id){
+
+  if(!confirm("هل تريد إلغاء هذا الحجز؟"))
+    return;
+
+  const { error } = await sb
+    .from("bookings")
+    .update({
+      booking_status:"cancelled"
+    })
+    .eq("id",id);
+
+  if(error){
+
+    alert(error.message);
+    return;
+
+  }
+
+  state.page="receptionistBookings";
+
+  await render();
+}
+async function receptionistAvailability(){
+
+  const today = new Date()
+    .toISOString()
+    .slice(0,10);
+
+  const selectedDate =
+    state.receptionDate || today;
+
+  const { data: fields, error: fieldsError } = await sb
+    .from("fields")
+    .select("*")
+    .order("id", { ascending:true });
+
+  if(fieldsError){
+    return shell(`
+      <div style="direction:rtl;text-align:right">
+
+        <h1 class="title">
+          توافر الملاعب
+        </h1>
+
+        <section class="section">
+          <p class="notice error">
+            ${esc(fieldsError.message)}
+          </p>
+        </section>
+
+      </div>
+    `);
+  }
+
+  const { data: bookings, error: bookingsError } = await sb
+    .from("bookings")
+    .select("*")
+    .eq("booking_date", selectedDate)
+    .neq("booking_status", "cancelled")
+    .order("start_time", { ascending:true });
+
+  if(bookingsError){
+    return shell(`
+      <div style="direction:rtl;text-align:right">
+
+        <h1 class="title">
+          توافر الملاعب
+        </h1>
+
+        <section class="section">
+          <p class="notice error">
+            ${esc(bookingsError.message)}
+          </p>
+        </section>
+
+      </div>
+    `);
+  }
+
+  const list = bookings || [];
+
+
+  return shell(`
+
+    <div style="
+      direction:rtl;
+      text-align:right;
+    ">
+
+      <!-- Header -->
+
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:15px;
+        flex-wrap:wrap;
+        margin-bottom:25px;
+      ">
+
+        <div>
+
+          <h1 class="title" style="margin-bottom:6px;">
+            توافر الملاعب
+          </h1>
+
+          <p class="muted">
+            متابعة حالة الملاعب والمواعيد المتاحة
+          </p>
+
+        </div>
+
+
+        <button
+          class="btn"
+          onclick="go('receptionist')"
+        >
+          ← لوحة الاستقبال
+        </button>
+
+      </div>
+
+
+      <!-- التاريخ -->
+
+      <section class="section">
+
+        <label style="
+          display:block;
+          margin-bottom:8px;
+          font-weight:bold;
+        ">
+          اختر التاريخ
+        </label>
+
+        <input
+          class="input"
+          type="date"
+          value="${selectedDate}"
+          min="${today}"
+          onchange="
+            state.receptionDate=this.value;
+            render();
+          "
+        >
+
+      </section>
+
+
+      <!-- الملعب -->
+
+      <section class="section">
+
+        <h2 style="margin-top:0;">
+          حالة الملاعب
+        </h2>
+
+        <div style="
+          display:grid;
+          grid-template-columns:
+            repeat(auto-fit,minmax(220px,1fr));
+          gap:16px;
+        ">
+
+          ${
+            (fields || []).map(field => {
+
+              const fieldBookings =
+                list.filter(b =>
+                  String(b.field_id) === String(field.id)
+                );
+
+              const hasBooking =
+                fieldBookings.length > 0;
+
+              return `
+
+                <div style="
+                  background:#fff;
+                  border:1px solid #e3e7ea;
+                  border-radius:16px;
+                  padding:20px;
+                  box-shadow:0 3px 12px rgba(0,0,0,.05);
+                ">
+
+                  <div style="
+                    display:flex;
+                    justify-content:space-between;
+                    align-items:center;
+                    gap:10px;
+                    margin-bottom:15px;
+                  ">
+
+                    <div>
+
+                      <h3 style="
+                        margin:0 0 6px;
+                      ">
+                        ${esc(field.field_name || field.name || "ملعب")}
+                      </h3>
+
+                      <span class="muted">
+                        ${esc(field.field_type || "")}
+                      </span>
+
+                    </div>
+
+
+                    <div style="
+                      font-size:30px;
+                    ">
+                      🏟️
+                    </div>
+
+                  </div>
+
+
+                  ${
+                    hasBooking
+
+                    ?
+
+                    `
+                    <div style="
+                      background:#fff0f0;
+                      color:#c62828;
+                      padding:10px;
+                      border-radius:10px;
+                      text-align:center;
+                      font-weight:bold;
+                    ">
+                      🔴 يوجد حجز
+                    </div>
+                    `
+
+                    :
+
+                    `
+                    <div style="
+                      background:#eaf8ef;
+                      color:#16834b;
+                      padding:10px;
+                      border-radius:10px;
+                      text-align:center;
+                      font-weight:bold;
+                    ">
+                      🟢 متاح
+                    </div>
+                    `
+                  }
+
+                </div>
+
+              `;
+
+            }).join("")
+          }
+
+        </div>
+
+      </section>
+
+
+      <!-- جدول المواعيد -->
+
+      <section class="section">
+
+        <div style="
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+          margin-bottom:18px;
+        ">
+
+          <div>
+
+            <h2 style="margin:0 0 5px;">
+              مواعيد الحجوزات
+            </h2>
+
+            <p class="muted" style="margin:0;">
+              ${esc(selectedDate)}
+            </p>
+
+          </div>
+
+        </div>
+
+
+        ${
+          list.length === 0
+
+          ?
+
+          `
+          <div style="
+            text-align:center;
+            padding:45px 20px;
+            color:#777;
+          ">
+
+            <div style="
+              font-size:45px;
+              margin-bottom:12px;
+            ">
+              🟢
+            </div>
+
+            لا توجد حجوزات في هذا اليوم
+          </div>
+          `
+
+          :
+
+          `
+          <div style="
+            overflow-x:auto;
+          ">
+
+            <table style="
+              width:100%;
+              border-collapse:collapse;
+              direction:rtl;
+            ">
+
+              <thead>
+
+                <tr>
+
+                  <th style="padding:13px;text-align:right;">
+                    الملعب
+                  </th>
+
+                  <th style="padding:13px;text-align:right;">
+                    البداية
+                  </th>
+
+                  <th style="padding:13px;text-align:right;">
+                    النهاية
+                  </th>
+
+                  <th style="padding:13px;text-align:right;">
+                    الحالة
+                  </th>
+
+                </tr>
+
+              </thead>
+
+
+              <tbody>
+
+                ${list.map(b => `
+
+                  <tr>
+
+                    <td style="padding:13px;">
+                      ${esc(b.field_id || "-")}
+                    </td>
+
+                    <td style="padding:13px;">
+                      ${esc(b.start_time || "-")}
+                    </td>
+
+                    <td style="padding:13px;">
+                      ${esc(b.end_time || "-")}
+                    </td>
+
+                    <td style="padding:13px;">
+
+                      ${
+                        String(b.booking_status).toLowerCase()
+                        === "confirmed"
+
+                        ?
+
+                        `
+                        <span style="
+                          color:#16834b;
+                          font-weight:bold;
+                        ">
+                          🟢 مؤكد
+                        </span>
+                        `
+
+                        :
+
+                        `
+                        <span style="
+                          color:#a66a00;
+                          font-weight:bold;
+                        ">
+                          ⏳ معلق
+                        </span>
+                        `
+                      }
+
+                    </td>
+
+                  </tr>
+
+                `).join("")}
+
+              </tbody>
+
+            </table>
+
+          </div>
+          `
+        }
+
+      </section>
+
+    </div>
+
+  `);
+}
 async function render(){
 
   if(!configured()){
@@ -3205,81 +4356,172 @@ async function render(){
      المدير
      ========================= */
 
-const isManager = state.profile?.role === "manager";
+  const isManager =
+    state.profile?.role === "manager";
 
-if(isManager){
+  if(isManager){
 
-  if(state.page==="manager"){
-    app.innerHTML=await managerDashboard();
+    if(state.page==="manager"){
+      app.innerHTML=await managerDashboard();
+    }
+
+    else if(state.page==="bookings"){
+      app.innerHTML=await managerBookings();
+    }
+
+    else if(state.page==="fields"){
+      app.innerHTML=fieldsPage();
+    }
+
+    else if(state.page==="profile"){
+      app.innerHTML=await managerCustomers();
+    }
+
+    else{
+      state.page="manager";
+      app.innerHTML=await managerDashboard();
+    }
+
+    return;
   }
 
-  else if(state.page==="bookings"){
-    app.innerHTML=await managerBookings();
+
+  /* =========================
+     موظف الاستقبال
+     ========================= */
+
+  const isReceptionist =
+    state.profile?.role === "receptionist";
+
+  if(isReceptionist){
+
+    if(state.page==="receptionist"){
+
+      app.innerHTML =
+        await receptionistDashboard();
+
+    }
+
+    else if(state.page==="receptionistBookings"){
+
+      app.innerHTML =
+        await receptionistBookings();
+
+    }
+
+    else if(state.page==="receptionistAvailability"){
+
+      app.innerHTML =
+        await receptionistAvailability();
+
+    }
+
+    else{
+
+      state.page="receptionist";
+
+      app.innerHTML =
+        await receptionistDashboard();
+
+    }
+
+    return;
   }
 
-  else if(state.page==="fields"){
-    app.innerHTML=fieldsPage();
-  }
 
-  else if(state.page==="profile"){
-    app.innerHTML=await managerCustomers();
-  }
-
-  else{
-    state.page="manager";
-    app.innerHTML=await managerDashboard();
-  }
-
-  return;
-}
   /* =========================
      المستخدم العادي
      ========================= */
 
- 
   if(state.page==="manager"){
     state.page="dashboard";
   }
 
+  if(state.page==="receptionist"){
+    state.page="dashboard";
+  }
+
+  if(state.page==="receptionistBookings"){
+    state.page="dashboard";
+  }
+
+  if(state.page==="receptionistAvailability"){
+    state.page="dashboard";
+  }
+
+
   if(state.page==="dashboard"){
-    app.innerHTML=await customerDashboard();
+
+    app.innerHTML =
+      await customerDashboard();
+
   }
 
   else if(state.page==="fields"){
-    app.innerHTML=fieldsPage();
+
+    app.innerHTML =
+      fieldsPage();
+
   }
 
   else if(state.page==="booking"){
-    app.innerHTML=booking();
+
+    app.innerHTML =
+      booking();
+
   }
 
   else if(state.page==="availability"){
-    app.innerHTML=availability();
+
+    app.innerHTML =
+      availability();
+
   }
 
   else if(state.page==="payment"){
-  app.innerHTML=await payment();
-}
-     else if(state.page==="paymentMethods"){
-  app.innerHTML=await paymentMethodsPage();
-     }
+
+    app.innerHTML =
+      await payment();
+
+  }
+
+  else if(state.page==="paymentMethods"){
+
+    app.innerHTML =
+      await paymentMethodsPage();
+
+  }
 
   else if(state.page==="success"){
-    app.innerHTML=success();
+
+    app.innerHTML =
+      success();
+
   }
 
   else if(state.page==="bookings"){
-    app.innerHTML=await bookings();
+
+    app.innerHTML =
+      await bookings();
+
   }
 
   else if(state.page==="profile"){
-    app.innerHTML=await profile();
+
+    app.innerHTML =
+      await profile();
+
   }
 
   else{
+
     state.page="dashboard";
-    app.innerHTML=await customerDashboard();
+
+    app.innerHTML =
+      await customerDashboard();
+
   }
+
 }
 
 init();
