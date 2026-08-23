@@ -57,7 +57,7 @@ ${sign?`<label>تأكيد كلمة المرور</label><input id="confirm" class
 }
 function side(){
  return `<aside class="side"><div class="brand"><span class="ball">⚽</span><span>نظام حجز<br>الملاعب</span></div><nav class="nav">
-${[["dashboard","الرئيسية"],["fields","الملاعب"],["bookings","حجوزاتي"],["payments","المدفوعات"],["profile","الملف الشخصي"]].map(x=>`<button class="${state.page===x[0]?"active":""}" onclick="go('${x[0]}')">${x[1]}</button>`).join("")}
+${[["dashboard","الرئيسية"],["fields","الملاعب"],["bookings","حجوزاتي"],["payment","المدفوعات"],["profile","الملف الشخصي"]].map(x=>`<button class="${state.page===x[0]?"active":""}" onclick="go('${x[0]}')">${x[1]}</button>`).join("")}
 <button onclick="logout()">تسجيل الخروج</button></nav></aside>`
 }
 function shell(body){return `<header class="top"><span>نظام حجز الملاعب الرياضية</span><span>مرحباً ${esc(state.profile?.full_name||state.user?.email||"")}</span></header><div class="layout">${side()}<main class="content">${body}</main></div>`}
