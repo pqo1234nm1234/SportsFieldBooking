@@ -64,7 +64,351 @@ function shell(body){return `<header class="top"><span>نظام حجز المل�
 function stat(n,t){return `<div class="stat"><div class="num">${esc(n)}</div><div>${t}</div></div>`}
 function card(f){return `<article class="card"><img src="${esc(f.image_url)}"><div class="cardbody"><h3>${esc(f.field_name)}</h3><p class="muted">${esc(f.field_type)}</p><div class="row"><b class="price">${money(f.price)} / ساعة</b><button class="btn primary" onclick="selectField(${f.field_id})">احجز الآن</button></div></div></article>`}
 async function selectField(id){state.field=state.fields.find(x=>x.field_id===id);go("booking")}
-function dashboard(){return shell(`<h1 class="title">لوحة تحكم العميل (الرئيسية)</h1><div class="grid4">${stat("0","مدفوعات معلقة")}${stat("—","إجمالي المدفوعات")}${stat("—","حجوزات مكتملة")}${stat("—","حجوزات قادمة")}</div><section class="section"><div class="row"><h2>الملاعب المتاحة</h2><button class="btn outline" onclick="go('fields')">عرض الكل</button></div><div class="grid3">${state.fields.slice(0,3).map(card).join("")||"<p>لا توجد ملاعب بعد.</p>"}</div></section>`)}
+async function dashboard(){
+
+  const {data: bookingsData,error: bookingsError}=await sb
+    .from("bookings")
+    .select(`
+      booking_id,
+      booking_date,
+      start_time,
+      end_time,
+      booking_status,
+      sports_fields(field_name,price)
+    `)
+    .eq("customer_id",state.user.id)
+    .order("booking_date",{ascending:false});
+
+  const {data: paymentsData}=await sb
+    .from("payments")
+    .select("amount,payment_status")
+    .eq("booking_id",
+      (bookingsData||[]).map(b=>b.booking_id).length
+        ? `in.(${(bookingsData||[]).map(b=>b.booking_id).join(",")})`
+        : "0"
+    );
+
+  if(bookingsError){
+    return shell(`
+      <h1 class="title">لوحة التحكم</h1>
+      <section class="section">
+        <p>${esc(bookingsError.message)}</p>
+      </section>
+    `);
+  }
+
+  const rows=bookingsData||[];
+
+  const today=new Date().toISOString().slice(0,10);
+
+  const upcoming=rows.filter(b=>
+    b.booking_status==="Confirmed" &&
+    b.booking_date>=today
+  );
+
+  const completed=rows.filter(b=>
+    b.booking_status==="Confirmed" &&
+    b.booking_date<today
+  );
+
+  const pending=rows.filter(b=>
+    b.booking_status==="Pending"
+  );
+
+  const cancelled=rows.filter(b=>
+    b.booking_status==="Cancelled"
+  );
+
+  const totalPayments=(paymentsData||[])
+    .filter(p=>p.payment_status==="Paid")
+    .reduce((sum,p)=>sum+Number(p.amount||0),0);
+
+  const recent=rows.slice(0,5);
+
+  const maxCount=Math.max(
+    ...Object.values(
+      rows.reduce((acc,b)=>{
+        const name=b.sports_fields?.field_name||"غير محدد";
+        acc[name]=(acc[name]||0)+1;
+        return acc;
+      },{})
+    ),
+    1
+  );
+
+  const fieldCounts=Object.entries(
+    rows.reduce((acc,b)=>{
+      const name=b.sports_fields?.field_name||"غير محدد";
+      acc[name]=(acc[name]||0)+1;
+      return acc;
+    },{})
+  )
+  .sort((a,b)=>b[1]-a[1])
+  .slice(0,4);
+
+  return shell(`
+
+    <h1 class="title">لوحة تحكم العميل (نظرة عامة)</h1>
+
+    <!-- الإحصائيات -->
+
+    <div class="grid4">
+
+      ${stat(
+        upcoming.length,
+        "حجوزات قادمة"
+      )}
+
+      ${stat(
+        completed.length,
+        "حجوزات مكتملة"
+      )}
+
+      ${stat(
+        pending.length,
+        "حجوزات معلقة"
+      )}
+
+      ${stat(
+        cancelled.length,
+        "حجوزات ملغاة"
+      )}
+
+    </div>
+
+
+    <!-- الرسوم والإحصائيات -->
+
+    <div class="grid2" style="margin-top:18px">
+
+      <section class="section">
+
+        <h2>الحجوزات</h2>
+
+        <div style="
+          height:220px;
+          display:flex;
+          align-items:flex-end;
+          justify-content:space-around;
+          gap:12px;
+          padding:20px 10px 10px;
+          border-bottom:1px solid #ddd;
+        ">
+
+          <div style="text-align:center;flex:1">
+            <div style="
+              height:${Math.max(upcoming.length*8,10)}px;
+              background:#27ae60;
+              border-radius:8px 8px 0 0;
+              max-height:160px;
+              margin:auto;
+            "></div>
+            <small>القادمة</small>
+            <br>
+            <b>${upcoming.length}</b>
+          </div>
+
+          <div style="text-align:center;flex:1">
+            <div style="
+              height:${Math.max(completed.length*8,10)}px;
+              background:#3498db;
+              border-radius:8px 8px 0 0;
+              max-height:160px;
+              margin:auto;
+            "></div>
+            <small>المكتملة</small>
+            <br>
+            <b>${completed.length}</b>
+          </div>
+
+          <div style="text-align:center;flex:1">
+            <div style="
+              height:${Math.max(pending.length*8,10)}px;
+              background:#f1c40f;
+              border-radius:8px 8px 0 0;
+              max-height:160px;
+              margin:auto;
+            "></div>
+            <small>المعلقة</small>
+            <br>
+            <b>${pending.length}</b>
+          </div>
+
+          <div style="text-align:center;flex:1">
+            <div style="
+              height:${Math.max(cancelled.length*8,10)}px;
+              background:#e74c3c;
+              border-radius:8px 8px 0 0;
+              max-height:160px;
+              margin:auto;
+            "></div>
+            <small>الملغاة</small>
+            <br>
+            <b>${cancelled.length}</b>
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <section class="section">
+
+        <h2>أكثر الملاعب حجزاً</h2>
+
+        ${
+          fieldCounts.length
+          ?
+          fieldCounts.map(([name,count])=>`
+            
+            <div style="margin:22px 0">
+
+              <div style="
+                display:flex;
+                justify-content:space-between;
+                margin-bottom:7px;
+              ">
+                <b>${esc(name)}</b>
+                <span>${count}</span>
+              </div>
+
+              <div style="
+                height:10px;
+                background:#eee;
+                border-radius:10px;
+                overflow:hidden;
+              ">
+
+                <div style="
+                  width:${(count/maxCount)*100}%;
+                  height:100%;
+                  background:#27ae60;
+                  border-radius:10px;
+                "></div>
+
+              </div>
+
+            </div>
+
+          `).join("")
+          :
+          `<p class="muted">لا توجد حجوزات حتى الآن.</p>`
+        }
+
+      </section>
+
+    </div>
+
+
+    <!-- الإيرادات -->
+
+    <section class="section" style="margin-top:18px">
+
+      <div class="row" style="justify-content:space-between">
+
+        <h2>إجمالي المدفوعات</h2>
+
+        <div class="price" style="font-size:24px">
+          ${money(totalPayments)}
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- أحدث الحجوزات -->
+
+    <section class="section" style="margin-top:18px">
+
+      <div class="row" style="justify-content:space-between">
+
+        <h2>أحدث الحجوزات</h2>
+
+        <button
+          class="btn outline"
+          onclick="go('bookings')">
+          عرض الكل
+        </button>
+
+      </div>
+
+
+      <div style="overflow:auto">
+
+        <table class="table">
+
+          <tr>
+            <th>رقم الحجز</th>
+            <th>الملعب</th>
+            <th>التاريخ</th>
+            <th>الوقت</th>
+            <th>السعر</th>
+            <th>الحالة</th>
+          </tr>
+
+          ${
+            recent.map(b=>`
+
+              <tr>
+
+                <td>
+                  <b>BK${String(b.booking_id).padStart(6,"0")}</b>
+                </td>
+
+                <td>
+                  ${esc(b.sports_fields?.field_name||"غير محدد")}
+                </td>
+
+                <td>
+                  ${b.booking_date}
+                </td>
+
+                <td>
+                  ${b.start_time} - ${b.end_time}
+                </td>
+
+                <td>
+                  ${money(b.sports_fields?.price||0)}
+                </td>
+
+                <td>
+
+                  ${
+                    b.booking_status==="Confirmed"
+                    ?
+                    `<span class="badge ok">مؤكد</span>`
+                    :
+                    b.booking_status==="Pending"
+                    ?
+                    `<span class="badge" style="background:#fff3cd;color:#856404">معلق</span>`
+                    :
+                    `<span class="badge" style="background:#f8d7da;color:#842029">ملغي</span>`
+                  }
+
+                </td>
+
+              </tr>
+
+            `).join("")
+            ||
+            `
+              <tr>
+                <td colspan="6" style="text-align:center;padding:25px">
+                  لا توجد حجوزات حتى الآن.
+                </td>
+              </tr>
+            `
+          }
+
+        </table>
+
+      </div>
+
+    </section>
+
+  `);
+}
 function fieldsPage(){return shell(`<h1 class="title">الملاعب المتاحة</h1><section class="section"><div class="toolbar"><input id="search" class="input" placeholder="ابحث عن ملعب..." oninput="filterFields()"><select id="typeFilter" onchange="filterFields()"><option value="">جميع الأنواع</option><option>خارجي</option><option>داخلي</option></select></div><div id="fieldList" class="list">${fieldRows(state.fields)}</div></section>`)}
 function fieldRows(arr){return arr.map(f=>`<div class="listrow"><img src="${esc(f.image_url)}"><div><b>${esc(f.field_name)}</b><p class="muted">النوع: ${esc(f.field_type)} | الموقع: ${esc(f.location)}</p></div><b class="price">${money(f.price)} / ساعة</b><button class="btn primary" onclick="selectField(${f.field_id})">احجز الآن</button></div>`).join("")||"<p>لا توجد نتائج.</p>"}
 function filterFields(){const q=document.querySelector("#search").value.toLowerCase(),t=document.querySelector("#typeFilter").value;document.querySelector("#fieldList").innerHTML=fieldRows(state.fields.filter(f=>(f.field_name.toLowerCase().includes(q)||f.location.toLowerCase().includes(q))&&(!t||f.field_type===t)))}
