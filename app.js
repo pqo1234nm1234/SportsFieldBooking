@@ -327,10 +327,10 @@ function side(){
           📅 حجوزاتي
         </button>
 
-        <button class="${state.page==="payment" ? "active" : ""}"
-          onclick="go('payment')">
-          💳 وسائل الدفع
-        </button>
+      <button class="${state.page==="paymentMethods" ? "active" : ""}"
+  onclick="go('paymentMethods')">
+  💳 وسائل الدفع
+</button>
 
         <button class="${state.page==="profile" ? "active" : ""}"
           onclick="go('profile')">
@@ -1148,9 +1148,61 @@ async function createBooking(){
   go("success");
 }
 
-function payment(){
+async function payment(){
 
-  const f=state.field;
+  const f = state.field;
+
+  const { data: methods, error } = await sb
+    .from("user_payment_methods")
+    .select("*")
+    .eq("user_id", state.user.id)
+    .order("created_at", { ascending:false });
+
+  if(error){
+    return shell(`
+      <h1 class="title">شاشة الدفع</h1>
+
+      <section class="section">
+        <p class="notice error">
+          ${esc(error.message)}
+        </p>
+      </section>
+    `);
+  }
+
+  const paymentMethods = methods || [];
+
+  if(paymentMethods.length === 0){
+
+    return shell(`
+
+      <h1 class="title">
+        شاشة الدفع
+      </h1>
+
+      <section class="section">
+
+        <h2>
+          لا توجد وسيلة دفع محفوظة
+        </h2>
+
+        <p class="muted">
+          أضف وسيلة دفع من صفحة "وسائل الدفع" أولاً.
+        </p>
+
+        <button
+          class="btn primary"
+          onclick="go('paymentMethods')"
+        >
+          + إضافة وسيلة دفع
+        </button>
+
+      </section>
+
+    `);
+  }
+
+  state.pay = paymentMethods[0].method_name;
 
   return shell(`
 
@@ -1175,51 +1227,84 @@ function payment(){
 
           <div>
             <b>التاريخ</b>
-            <span>${state.date}</span>
+            <span>${esc(state.date)}</span>
           </div>
 
           <div>
             <b>الوقت</b>
-            <span>${state.start} إلى ${state.end}</span>
+            <span>
+              ${esc(state.start)} إلى ${esc(state.end)}
+            </span>
           </div>
 
         </div>
 
       </section>
 
+
       <section class="section">
 
         <h2>
-          طريقة الدفع
+          اختر وسيلة الدفع
         </h2>
 
         ${
-          ["Card","Cash","Wallet","Vodafone Cash"]
-          .map((m,i)=>`
-            <label class="method">
+          paymentMethods.map((m,i)=>`
+
+            <label
+              class="method"
+              style="
+                display:flex;
+                align-items:center;
+                gap:12px;
+                cursor:pointer;
+              "
+            >
 
               <input
                 type="radio"
                 name="pay"
-                ${i===0?"checked":""}
-                onchange="state.pay='${m}'"
+                value="${esc(m.method_name)}"
+                ${i===0 ? "checked" : ""}
+                onchange="
+                  state.pay=this.value;
+                  state.paymentMethodId=${Number(m.id)};
+                "
               >
 
-              ${m}
+              <span>
+                <b>${esc(m.method_name)}</b>
+                <small style="
+                  display:block;
+                  color:#777;
+                  margin-top:4px;
+                ">
+                  ${esc(m.payment_details)}
+                </small>
+              </span>
 
             </label>
-          `)
-          .join("")
+
+          `).join("")
         }
+
+        <button
+          class="btn outline"
+          style="margin-top:15px"
+          onclick="go('paymentMethods')"
+        >
+          إدارة وسائل الدفع
+        </button>
 
       </section>
 
     </div>
 
+
     <section class="section">
 
       <div class="alert">
-        🔒 واجهة دفع تجريبية للمشروع — يتم حفظ عملية الدفع في جدول PAYMENT.
+        🔒 سيتم استخدام وسيلة الدفع التي اخترتها وإتمام الحجز.
       </div>
 
       <button
@@ -1230,9 +1315,9 @@ function payment(){
       </button>
 
     </section>
+
   `);
 }
-
 function success(){
 
   return shell(`
@@ -1507,77 +1592,546 @@ async function managerDashboard(){
 }
 async function customerDashboard(){
 
-  const {data:fields,error}=await sb
-    .from("sports_fields")
-    .select("*")
-    .order("field_id",{ascending:true});
+  /* =========================
+     بيانات حجوزات العميل
+     ========================= */
 
-  if(error){
+  const { data: bookingsData, error: bookingsError } = await sb
+    .from("bookings")
+    .select(`
+      booking_id,
+      booking_date,
+      start_time,
+      end_time,
+      booking_status,
+      sports_fields (
+        field_name,
+        field_type,
+        price,
+        image_url
+      )
+    `)
+    .eq("customer_id", state.user.id)
+    .order("booking_date", { ascending: false });
+
+  if(bookingsError){
     return shell(`
       <h1 class="title">الرئيسية</h1>
       <section class="section">
-        <p>${esc(error.message)}</p>
+        <p>${esc(bookingsError.message)}</p>
       </section>
     `);
   }
 
-  return shell(`
-    <h1 class="title">الرئيسية</h1>
+  const bookings = bookingsData || [];
 
-    <section class="section">
 
-      <h2 style="margin-bottom:10px">
-        مرحباً ${esc(state.profile?.full_name || state.user.email)}
-      </h2>
+  /* =========================
+     الإحصائيات
+     ========================= */
 
-      <p style="margin-bottom:25px">
-        اختر الملعب المناسب واحجز موعدك بسهولة.
-      </p>
+  const upcoming = bookings.filter(b =>
+    b.booking_status === "Confirmed"
+  ).length;
 
-      <h2 class="title" style="font-size:24px">
-        الملاعب المتاحة
-      </h2>
+  const completed = bookings.filter(b =>
+    b.booking_status === "Completed"
+  ).length;
 
-      <div class="grid">
+  const pending = bookings.filter(b =>
+    b.booking_status === "Pending"
+  ).length;
 
-        ${(fields||[]).map(f=>`
+  const totalPaid = bookings
+    .filter(b =>
+      b.booking_status === "Confirmed" ||
+      b.booking_status === "Completed"
+    )
+    .reduce(
+      (sum, b) => sum + Number(b.sports_fields?.price || 0),
+      0
+    );
 
-          <div class="card">
 
-            ${
-              f.image_url
-              ? `<img src="${esc(f.image_url)}"
-                    style="width:100%;height:180px;object-fit:cover;border-radius:10px">`
-              : ""
-            }
+  /* =========================
+     الملاعب
+     ========================= */
 
-            <h2>${esc(f.field_name || "ملعب")}</h2>
+  const { data: fieldsData, error: fieldsError } = await sb
+    .from("sports_fields")
+    .select("*")
+    .order("field_id", { ascending: true });
 
-            <p>
-              ${esc(f.field_type || "")}
-            </p>
+  if(fieldsError){
+    return shell(`
+      <h1 class="title">الرئيسية</h1>
+      <section class="section">
+        <p>${esc(fieldsError.message)}</p>
+      </section>
+    `);
+  }
 
-            <p class="price">
-              ${Number(f.price||0).toFixed(2)} ج.م / ساعة
-            </p>
+  const fields = fieldsData || [];
+
+
+  /* =========================
+     صورة الملعب
+     ========================= */
+
+  function fieldImage(field){
+
+    if(field.image_url)
+      return field.image_url;
+
+    if(field.image)
+      return field.image;
+
+    if(field.photo_url)
+      return field.photo_url;
+
+    const name = String(
+      field.field_name ||
+      field.name ||
+      ""
+    ).toLowerCase();
+
+    if(
+      name.includes("قدم") ||
+      name.includes("football")
+    ){
+      return "assets/football.jpg";
+    }
+
+    if(
+      name.includes("سلة") ||
+      name.includes("basket")
+    ){
+      return "assets/basketball.jpg";
+    }
+
+    if(
+      name.includes("تنس") ||
+      name.includes("tennis")
+    ){
+      return "assets/tennis.jpg";
+    }
+
+    return "assets/football.jpg";
+  }
+
+
+  /* =========================
+     كارت الملعب
+     ========================= */
+
+  function customerFieldCard(field){
+
+    const fieldName =
+      field.field_name ||
+      field.name ||
+      "ملعب";
+
+    const fieldType =
+      field.field_type ||
+      field.type ||
+      "خارجي";
+
+    const price =
+      Number(field.price || 0).toFixed(0);
+
+    return `
+      <div style="
+        background:#fff;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        overflow:hidden;
+        box-shadow:0 2px 8px rgba(0,0,0,.04);
+      ">
+
+        <!-- صورة الملعب -->
+        <div style="
+          width:100%;
+          height:170px;
+          overflow:hidden;
+        ">
+          <img
+            src="${esc(fieldImage(field))}"
+            alt="${esc(fieldName)}"
+            style="
+              width:100%;
+              height:100%;
+              object-fit:cover;
+              display:block;
+            "
+            onerror="this.src='assets/football.jpg'"
+          >
+        </div>
+
+
+        <!-- بيانات الملعب -->
+        <div style="
+          padding:15px 18px 18px;
+        ">
+
+          <h3 style="
+            margin:0 0 7px;
+            font-size:19px;
+            font-weight:700;
+          ">
+            ${esc(fieldName)}
+          </h3>
+
+
+          <p style="
+            margin:0 0 18px;
+            color:#777;
+            font-size:15px;
+          ">
+            ${esc(fieldType)}
+          </p>
+
+
+          <div style="
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+          ">
+
+            <strong style="
+              color:#159447;
+              font-size:16px;
+            ">
+              ${price} ج.م / ساعة
+            </strong>
+
 
             <button
-              class="btn primary"
-              onclick="state.field=${JSON.stringify(f)};go('booking')">
-              احجز الآن
+              onclick="
+                state.field=state.fields.find(
+                  x=>x.field_id===${Number(field.field_id)}
+                );
+                go('booking');
+              "
+              style="
+                border:0;
+                background:#fff;
+                font-size:24px;
+                cursor:pointer;
+                padding:4px 8px;
+              "
+              title="احجز الآن"
+            >
+              📅
             </button>
 
           </div>
 
-        `).join("")}
+        </div>
+
+      </div>
+    `;
+  }
+
+
+  /* =========================
+     الرئيسية الجديدة
+     ========================= */
+
+  return shell(`
+
+    <h1 class="title">
+      لوحة تحكم العميل (الرئيسية)
+    </h1>
+
+
+    <!-- =========================
+         WELCOME
+         ========================= -->
+
+    <section style="
+      background:#fff;
+      border:1px solid #e5e7eb;
+      border-radius:16px;
+      padding:22px 28px;
+      margin-bottom:22px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      direction:rtl;
+    ">
+
+      <div>
+
+        <h2 style="
+          margin:0 0 8px;
+          font-size:22px;
+        ">
+          مرحباً، ${esc(
+            state.profile?.full_name ||
+            state.user?.email ||
+            "عميل"
+          )}
+        </h2>
+
+        <p style="
+          margin:0;
+          color:#777;
+        ">
+          ماذا ستلعب اليوم؟
+        </p>
+
+      </div>
+
+
+      <div style="
+        width:58px;
+        height:58px;
+        border-radius:50%;
+        background:#eef2f5;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:32px;
+      ">
+        👤
+      </div>
+
+    </section>
+
+
+    <!-- =========================
+         STATISTICS
+         ========================= -->
+
+    <section style="
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:18px;
+      margin-bottom:30px;
+      direction:rtl;
+    ">
+
+
+      <!-- مدفوعات معلقة -->
+
+      <div style="
+        background:#fff;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        padding:20px;
+        text-align:center;
+      ">
+
+        <div style="
+          font-size:30px;
+          margin-bottom:8px;
+        ">
+          🕐
+        </div>
+
+        <div style="
+          color:#e39a00;
+          font-size:25px;
+          font-weight:700;
+        ">
+          ${pending}
+        </div>
+
+        <div style="
+          margin-top:6px;
+          font-size:15px;
+        ">
+          مدفوعات معلقة
+        </div>
+
+      </div>
+
+
+      <!-- إجمالي المدفوعات -->
+
+      <div style="
+        background:#fff;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        padding:20px;
+        text-align:center;
+      ">
+
+        <div style="
+          font-size:30px;
+          margin-bottom:8px;
+        ">
+          💳
+        </div>
+
+        <div style="
+          color:#159447;
+          font-size:25px;
+          font-weight:700;
+        ">
+          ${totalPaid.toFixed(2)} ج.م
+        </div>
+
+        <div style="
+          margin-top:6px;
+          font-size:15px;
+        ">
+          إجمالي المدفوعات
+        </div>
+
+      </div>
+
+
+      <!-- حجوزات مكتملة -->
+
+      <div style="
+        background:#fff;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        padding:20px;
+        text-align:center;
+      ">
+
+        <div style="
+          font-size:30px;
+          margin-bottom:8px;
+        ">
+          ✓
+        </div>
+
+        <div style="
+          color:#159447;
+          font-size:25px;
+          font-weight:700;
+        ">
+          ${completed}
+        </div>
+
+        <div style="
+          margin-top:6px;
+          font-size:15px;
+        ">
+          حجوزات مكتملة
+        </div>
+
+      </div>
+
+
+      <!-- حجوزات قادمة -->
+
+      <div style="
+        background:#fff;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        padding:20px;
+        text-align:center;
+      ">
+
+        <div style="
+          font-size:30px;
+          margin-bottom:8px;
+        ">
+          📅
+        </div>
+
+        <div style="
+          color:#1769d1;
+          font-size:25px;
+          font-weight:700;
+        ">
+          ${upcoming}
+        </div>
+
+        <div style="
+          margin-top:6px;
+          font-size:15px;
+        ">
+          حجوزات قادمة
+        </div>
 
       </div>
 
     </section>
+
+
+    <!-- =========================
+         AVAILABLE FIELDS
+         ========================= -->
+
+    <section style="
+      background:#fff;
+      border:1px solid #e5e7eb;
+      border-radius:16px;
+      padding:24px;
+      direction:rtl;
+    ">
+
+
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        margin-bottom:20px;
+      ">
+
+        <h2 style="
+          margin:0;
+          font-size:24px;
+        ">
+          الملاعب المتاحة
+        </h2>
+
+
+        <button
+          onclick="go('fields')"
+          style="
+            border:0;
+            background:transparent;
+            color:#159447;
+            font-weight:700;
+            font-size:16px;
+            cursor:pointer;
+          "
+        >
+          عرض الكل
+        </button>
+
+      </div>
+
+
+      <div style="
+        display:grid;
+        grid-template-columns:repeat(3,1fr);
+        gap:22px;
+      ">
+
+        ${
+          fields.length
+          ?
+          fields
+            .slice(0,3)
+            .map(customerFieldCard)
+            .join("")
+          :
+          `
+            <div style="
+              grid-column:1/-1;
+              text-align:center;
+              padding:40px;
+              color:#777;
+            ">
+              لا توجد ملاعب متاحة حالياً.
+            </div>
+          `
+        }
+
+      </div>
+
+    </section>
+
   `);
 }
-
-
 
 
 
@@ -1705,6 +2259,470 @@ async function profile(){
   `);
 }
 
+async function managerBookings(){
+
+  const {data,error}=await sb
+    .from("bookings")
+    .select(`
+      booking_id,
+      customer_id,
+      booking_date,
+      start_time,
+      end_time,
+      booking_status,
+      sports_fields(field_name,price)
+    `)
+    .order("booking_date",{ascending:false});
+
+  if(error){
+    return shell(`
+      <h1 class="title">الحجوزات</h1>
+      <section class="section">
+        <p>${esc(error.message)}</p>
+      </section>
+    `);
+  }
+
+  const rows=data||[];
+
+  return shell(`
+    <h1 class="title">الحجوزات</h1>
+
+    <section class="section">
+
+      <div style="overflow:auto">
+
+        <table class="table">
+
+          <tr>
+            <th>رقم الحجز</th>
+            <th>الملعب</th>
+            <th>التاريخ</th>
+            <th>الوقت</th>
+            <th>السعر</th>
+            <th>الحالة</th>
+          </tr>
+
+          ${
+            rows.map(b=>`
+              <tr>
+
+                <td>
+                  BK${b.booking_id}
+                </td>
+
+                <td>
+                  ${esc(b.sports_fields?.field_name||"-")}
+                </td>
+
+                <td>
+                  ${b.booking_date}
+                </td>
+
+                <td>
+                  ${b.start_time} - ${b.end_time}
+                </td>
+
+                <td>
+                  ${money(b.sports_fields?.price||0)}
+                </td>
+
+                <td>
+                  <span class="badge ok">
+                    ${esc(b.booking_status)}
+                  </span>
+                </td>
+
+              </tr>
+            `).join("")
+            ||
+            `<tr>
+              <td colspan="6" style="text-align:center">
+                لا توجد حجوزات.
+              </td>
+            </tr>`
+          }
+
+        </table>
+
+      </div>
+
+    </section>
+  `);
+}
+
+async function managerCustomers(){
+
+  const {data,error}=await sb
+    .from("profiles")
+    .select("id,full_name,phone,role")
+    .neq("role","manager")
+    .order("full_name");
+
+  if(error){
+    return shell(`
+      <h1 class="title">العملاء</h1>
+      <section class="section">
+        <p>${esc(error.message)}</p>
+      </section>
+    `);
+  }
+
+  const customers=data||[];
+
+  return shell(`
+    <h1 class="title">العملاء</h1>
+
+    <section class="section">
+
+      <div style="overflow:auto">
+
+        <table class="table">
+
+          <tr>
+            <th>الاسم</th>
+            <th>رقم الهاتف</th>
+            <th>معرف العميل</th>
+          </tr>
+
+          ${
+            customers.map(c=>`
+              <tr>
+
+                <td>
+                  ${esc(c.full_name||"غير محدد")}
+                </td>
+
+                <td>
+                  ${esc(c.phone||"غير مضاف")}
+                </td>
+
+                <td>
+                  ${esc(c.id)}
+                </td>
+
+              </tr>
+            `).join("")
+            ||
+            `<tr>
+              <td colspan="3" style="text-align:center">
+                لا يوجد عملاء.
+              </td>
+            </tr>`
+          }
+
+        </table>
+
+      </div>
+
+    </section>
+  `);
+}
+
+
+
+async function paymentMethodsPage(){
+
+  const { data, error } = await sb
+    .from("user_payment_methods")
+    .select("*")
+    .eq("user_id", state.user.id)
+    .order("created_at", { ascending:false });
+
+  if(error){
+    return shell(`
+      <h1 class="title">وسائل الدفع</h1>
+
+      <section class="section">
+        <p class="notice error">
+          ${esc(error.message)}
+        </p>
+      </section>
+    `);
+  }
+
+  const methods = data || [];
+
+  return shell(`
+
+    <h1 class="title">
+      وسائل الدفع
+    </h1>
+
+    <section class="section">
+
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        margin-bottom:25px;
+        direction:rtl;
+      ">
+
+        <div>
+          <h2 style="margin:0 0 8px;">
+            وسائل الدفع الخاصة بي
+          </h2>
+
+          <p class="muted" style="margin:0;">
+            أضف وسائل الدفع التي تستخدمها لحجوزاتك
+          </p>
+        </div>
+
+        <button
+          class="btn primary"
+          onclick="addUserPaymentMethod()"
+        >
+          + إضافة وسيلة دفع
+        </button>
+
+      </div>
+
+
+      ${
+        methods.length === 0
+
+        ?
+
+        `
+        <div style="
+          text-align:center;
+          padding:50px 20px;
+          color:#777;
+        ">
+          <div style="font-size:45px;margin-bottom:15px;">
+            💳
+          </div>
+
+          <h3>
+            لا توجد وسائل دفع محفوظة
+          </h3>
+
+          <p>
+            أضف وسيلة دفع لتستخدمها بسهولة عند الحجز.
+          </p>
+        </div>
+        `
+
+        :
+
+        `
+        <div style="
+          display:grid;
+          grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+          gap:18px;
+          direction:rtl;
+        ">
+
+          ${methods.map(m => `
+
+            <div style="
+              background:#fff;
+              border:1px solid #e3e7ea;
+              border-radius:15px;
+              padding:20px;
+              box-shadow:0 2px 8px rgba(0,0,0,.04);
+            ">
+
+              <div style="
+                display:flex;
+                align-items:center;
+                gap:15px;
+                margin-bottom:15px;
+              ">
+
+                <div style="
+                  width:50px;
+                  height:50px;
+                  border-radius:12px;
+                  background:#f1f5f4;
+                  display:flex;
+                  align-items:center;
+                  justify-content:center;
+                  font-size:27px;
+                ">
+                  ${
+                    String(m.method_name).toLowerCase().includes("visa")
+                    ? "💳"
+                    : String(m.method_name).toLowerCase().includes("wallet")
+                    ? "📱"
+                    : "💰"
+                  }
+                </div>
+
+                <div>
+
+                  <h3 style="
+                    margin:0 0 5px;
+                  ">
+                    ${esc(m.method_name)}
+                  </h3>
+
+                  <span style="
+                    color:#777;
+                    font-size:14px;
+                  ">
+                    وسيلة دفع محفوظة
+                  </span>
+
+                </div>
+
+              </div>
+
+
+              <div style="
+                background:#f8faf9;
+                border-radius:10px;
+                padding:12px;
+                margin-bottom:15px;
+                direction:ltr;
+                text-align:left;
+              ">
+                ${esc(m.payment_details)}
+              </div>
+
+
+              <button
+                class="btn"
+                style="
+                  width:100%;
+                  background:#dc3545;
+                  color:white;
+                  border:0;
+                "
+                onclick="deleteUserPaymentMethod(${m.id})"
+              >
+                حذف وسيلة الدفع
+              </button>
+
+            </div>
+
+          `).join("")}
+
+        </div>
+        `
+      }
+
+    </section>
+
+  `);
+}
+async function addUserPaymentMethod(){
+
+  const method = prompt(
+    "اكتب نوع وسيلة الدفع:\nVisa / Wallet / Fawry / Aman"
+  );
+
+  if(!method || !method.trim())
+    return;
+
+  const details = prompt(
+    "اكتب رقم أو بيانات وسيلة الدفع:"
+  );
+
+  if(!details || !details.trim())
+    return;
+
+  const { error } = await sb
+    .from("user_payment_methods")
+    .insert({
+      user_id: state.user.id,
+      method_name: method.trim(),
+      payment_details: details.trim()
+    });
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  state.page = "paymentMethods";
+
+  await render();
+}
+
+
+
+
+async function deleteUserPaymentMethod(id){
+
+  if(!confirm("هل تريد حذف وسيلة الدفع دي؟"))
+    return;
+
+  const { error } = await sb
+    .from("user_payment_methods")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", state.user.id);
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  state.page = "paymentMethods";
+
+  await render();
+}
+
+
+
+async function addUserPaymentMethod(){
+
+  const method = prompt(
+    "اكتب نوع وسيلة الدفع:\nVisa / Wallet / Fawry / Aman"
+  );
+
+  if(!method || !method.trim())
+    return;
+
+  const details = prompt(
+    "اكتب رقم أو بيانات وسيلة الدفع:"
+  );
+
+  if(!details || !details.trim())
+    return;
+
+  const { error } = await sb
+    .from("user_payment_methods")
+    .insert({
+      user_id: state.user.id,
+      method_name: method.trim(),
+      payment_details: details.trim()
+    });
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  state.page = "paymentMethods";
+
+  await render();
+}
+
+
+async function deleteUserPaymentMethod(id){
+
+  if(!confirm("هل تريد حذف وسيلة الدفع دي؟"))
+    return;
+
+  const { error } = await sb
+    .from("user_payment_methods")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", state.user.id);
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  state.page = "paymentMethods";
+
+  await render();
+}
+
 async function render(){
 
   if(!configured()){
@@ -1732,26 +2750,43 @@ async function render(){
     return;
   }
 
-  const isManager = state.profile?.role === "manager";
 
   /* =========================
      المدير
      ========================= */
 
-  if(isManager){
+const isManager = state.profile?.role === "manager";
 
-    if(state.page !== "manager"){
-      state.page="manager";
-    }
+if(isManager){
 
+  if(state.page==="manager"){
     app.innerHTML=await managerDashboard();
-    return;
   }
 
+  else if(state.page==="bookings"){
+    app.innerHTML=await managerBookings();
+  }
+
+  else if(state.page==="fields"){
+    app.innerHTML=fieldsPage();
+  }
+
+  else if(state.page==="profile"){
+    app.innerHTML=await managerCustomers();
+  }
+
+  else{
+    state.page="manager";
+    app.innerHTML=await managerDashboard();
+  }
+
+  return;
+}
   /* =========================
      المستخدم العادي
      ========================= */
 
+ 
   if(state.page==="manager"){
     state.page="dashboard";
   }
@@ -1775,6 +2810,9 @@ async function render(){
   else if(state.page==="payment"){
     app.innerHTML=payment();
   }
+     else if(state.page==="paymentMethods"){
+  app.innerHTML=await paymentMethodsPage();
+     }
 
   else if(state.page==="success"){
     app.innerHTML=success();
