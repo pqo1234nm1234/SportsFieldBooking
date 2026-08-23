@@ -3318,7 +3318,7 @@ async function receptionistDashboard(){
           <button
             class="btn primary"
             style="padding:22px;"
-            onclick="go('receptionistBookings')"
+            onclick="state.page='receptionistBookings'; render();"
           >
             📅
             <br>
