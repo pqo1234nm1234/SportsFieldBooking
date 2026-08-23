@@ -2578,7 +2578,46 @@ async function paymentMethodsPage(){
                 direction:ltr;
                 text-align:left;
               ">
-                ${esc(m.payment_details)}
+                ${
+  (() => {
+    try {
+      const d = JSON.parse(m.payment_details);
+
+      if(m.method_name === "Visa"){
+        return `
+          <div style="font-size:16px;">
+            💳 بطاقة Visa
+            <br>
+            <span style="color:#666;">
+              •••• ${esc(d.card_last4 || "")}
+            </span>
+            <br>
+            <span style="color:#666;">
+              تاريخ الانتهاء: ${esc(d.expiry || "")}
+            </span>
+          </div>
+        `;
+      }
+
+      if(m.method_name === "Wallet"){
+        return `
+          <div style="font-size:16px;">
+            📱 رقم المحفظة
+            <br>
+            <span style="color:#666;">
+              ${esc(d.wallet_number || "")}
+            </span>
+          </div>
+        `;
+      }
+
+      return esc(m.payment_details);
+
+    } catch(e){
+      return esc(m.payment_details);
+    }
+  })()
+}
               </div>
 
 
