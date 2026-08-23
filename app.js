@@ -106,6 +106,7 @@ async function createBooking(){
 function payment(){const f=state.field;return shell(`<h1 class="title">شاشة الدفع</h1><div class="payment"><section class="section"><h2>ملخص الحجز</h2><div class="info"><div><b>الملعب</b><span>${esc(f.field_name)}</span></div><div><b>التاريخ</b><span>${state.date}</span></div><div><b>الوقت</b><span>${state.start} إلى ${state.end}</span></div></div></section><section class="section"><h2>طريقة الدفع</h2>${["Card","Cash","Wallet","Vodafone Cash"].map((m,i)=>`<label class="method"><input type="radio" name="pay" ${i===0?"checked":""} onchange="state.pay='${m}'"> ${m}</label>`).join("")}</section></div><section class="section"><div class="alert">🔒 واجهة دفع تجريبية للمشروع — يتم حفظ عملية الدفع في جدول PAYMENT.</div><button class="btn primary full" onclick="createBooking()">إتمام الدفع</button></section>`)}
 function success(){return shell(`<h1 class="title">شاشة تأكيد الحجز</h1><section class="section success"><div class="check">✓</div><h1 class="price">تم تأكيد الحجز بنجاح!</h1><p>تم حفظ الحجز والدفع في قاعدة البيانات.</p><div class="row"><button class="btn outline" onclick="go('dashboard')">العودة إلى الرئيسية</button><button class="btn primary" onclick="go('bookings')">عرض حجوزاتي</button></div></section>`)}
 async function bookings(){
+
   const {data,error}=await sb
     .from("bookings")
     .select("booking_id,booking_date,start_time,end_time,booking_status,sports_fields(field_name,price)")
@@ -113,30 +114,41 @@ async function bookings(){
     .order("booking_date",{ascending:false});
 
   if(error)
-    return shell(`<section class="section"><p>${esc(error.message)}</p></section>`);
+    return shell(`
+      <section class="section">
+        <p>${esc(error.message)}</p>
+      </section>
+    `);
 
   const rows=data||[];
 
-  const upcoming=rows.filter(b=>b.booking_status==="Confirmed" || b.booking_status==="Pending");
-  const completed=rows.filter(b=>b.booking_status==="Completed");
-  const cancelled=rows.filter(b=>b.booking_status==="Cancelled");
+  const upcoming=rows.filter(b =>
+    b.booking_status==="Confirmed" ||
+    b.booking_status==="Pending"
+  );
 
-  function statusBadge(status){
-    if(status==="Confirmed")
-      return `<span class="badge ok">مؤكد</span>`;
-    if(status==="Pending")
-      return `<span class="badge" style="background:#fff3cd;color:#856404">معلق</span>`;
-    if(status==="Cancelled")
-      return `<span class="badge" style="background:#f8d7da;color:#842029">ملغي</span>`;
-    if(status==="Completed")
-      return `<span class="badge ok">مكتمل</span>`;
-    return `<span class="badge">${esc(status)}</span>`;
-  }
+  const completed=rows.filter(b =>
+    b.booking_status==="Completed"
+  );
 
-  function table(list){
+  const cancelled=rows.filter(b =>
+    b.booking_status==="Cancelled"
+  );
+
+  function makeTable(list){
+
+    if(!list.length){
+      return `
+        <div style="text-align:center;padding:35px">
+          لا توجد حجوزات.
+        </div>
+      `;
+    }
+
     return `
       <div style="overflow:auto">
         <table class="table">
+
           <tr>
             <th>رقم الحجز</th>
             <th>الملعب</th>
@@ -147,29 +159,76 @@ async function bookings(){
             <th>الإجراءات</th>
           </tr>
 
-          ${
-            list.map(b=>`
+          ${list.map(b=>{
+
+            let status="";
+
+            if(b.booking_status==="Confirmed"){
+              status=`<span class="badge ok">مؤكد</span>`;
+            }else if(b.booking_status==="Pending"){
+              status=`<span class="badge" style="background:#fff3cd;color:#856404">معلق</span>`;
+            }else if(b.booking_status==="Cancelled"){
+              status=`<span class="badge" style="background:#f8d7da;color:#842029">ملغي</span>`;
+            }else if(b.booking_status==="Completed"){
+              status=`<span class="badge ok">مكتمل</span>`;
+            }else{
+              status=`<span class="badge">${esc(b.booking_status||"غير محدد")}</span>`;
+            }
+
+            return `
               <tr>
-                <td>BK${b.booking_id}</td>
-                <td>${esc(b.sports_fields?.field_name||"غير محدد")}</td>
-                <td>${b.booking_date}</td>
-                <td>${b.start_time} - ${b.end_time}</td>
-                <td>${Number(b.sports_fields?.price||0).toFixed(2)} ج.م</td>
-                <td>${statusBadge(b.booking_status)}</td>
+
                 <td>
-                  <button class="btn" onclick="go('booking')">عرض</button>
+                  BK${b.booking_id}
                 </td>
+
+                <td>
+                  ${esc(b.sports_fields?.field_name||"غير محدد")}
+                </td>
+
+                <td>
+                  ${b.booking_date}
+                </td>
+
+                <td>
+                  ${b.start_time} - ${b.end_time}
+                </td>
+
+                <td>
+                  ${Number(b.sports_fields?.price||0).toFixed(2)} ج.م
+                </td>
+
+                <td>
+                  ${status}
+                </td>
+
+                <td>
+                  <button
+                    class="btn"
+                    onclick="alert('رقم الحجز: BK${b.booking_id}')">
+                    عرض
+                  </button>
+                </td>
+
               </tr>
-            `).join("")
-            || `<tr><td colspan="7" style="text-align:center;padding:25px">لا توجد حجوزات.</td></tr>`
-          }
+            `;
+
+          }).join("")}
+
         </table>
       </div>
     `;
   }
 
+  const upcomingHTML=makeTable(upcoming);
+  const completedHTML=makeTable(completed);
+  const cancelledHTML=makeTable(cancelled);
+
   return shell(`
-    <h1 class="title">حجوزاتي</h1>
+
+    <h1 class="title">
+      حجوزاتي
+    </h1>
 
     <section class="section">
 
@@ -177,37 +236,72 @@ async function bookings(){
         display:flex;
         justify-content:center;
         gap:10px;
-        border-bottom:1px solid #ddd;
         margin-bottom:20px;
-        flex-wrap:wrap;
+        border-bottom:1px solid #ddd;
+        padding-bottom:15px;
       ">
-        <button class="btn primary" onclick="
-          document.getElementById('bookingTable').innerHTML=
-          \`${table(upcoming)}\`
-        ">
+
+        <button
+          id="tabUpcoming"
+          class="btn primary"
+          onclick="
+            document.getElementById('upcomingBox').style.display='block';
+            document.getElementById('completedBox').style.display='none';
+            document.getElementById('cancelledBox').style.display='none';
+            this.classList.add('primary');
+            document.getElementById('tabCompleted').classList.remove('primary');
+            document.getElementById('tabCancelled').classList.remove('primary');
+          ">
           القادمة
         </button>
 
-        <button class="btn" onclick="
-          document.getElementById('bookingTable').innerHTML=
-          \`${table(completed)}\`
-        ">
+        <button
+          id="tabCompleted"
+          class="btn"
+          onclick="
+            document.getElementById('upcomingBox').style.display='none';
+            document.getElementById('completedBox').style.display='block';
+            document.getElementById('cancelledBox').style.display='none';
+            this.classList.add('primary');
+            document.getElementById('tabUpcoming').classList.remove('primary');
+            document.getElementById('tabCancelled').classList.remove('primary');
+          ">
           المكتملة
         </button>
 
-        <button class="btn" onclick="
-          document.getElementById('bookingTable').innerHTML=
-          \`${table(cancelled)}\`
-        ">
+        <button
+          id="tabCancelled"
+          class="btn"
+          onclick="
+            document.getElementById('upcomingBox').style.display='none';
+            document.getElementById('completedBox').style.display='none';
+            document.getElementById('cancelledBox').style.display='block';
+            this.classList.add('primary');
+            document.getElementById('tabUpcoming').classList.remove('primary');
+            document.getElementById('tabCompleted').classList.remove('primary');
+          ">
           الملغاة
         </button>
+
       </div>
 
-      <div id="bookingTable">
-        ${table(upcoming)}
+
+      <div id="upcomingBox">
+        ${upcomingHTML}
+      </div>
+
+
+      <div id="completedBox" style="display:none">
+        ${completedHTML}
+      </div>
+
+
+      <div id="cancelledBox" style="display:none">
+        ${cancelledHTML}
       </div>
 
     </section>
+
   `);
 }
 
