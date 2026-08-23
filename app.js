@@ -2471,7 +2471,7 @@ async function paymentMethodsPage(){
 
         <button
           class="btn primary"
-          onclick="addUserPaymentMethod()"
+          onclick="showAddPaymentMethodForm()"
         >
           + إضافة وسيلة دفع
         </button>
@@ -2610,95 +2610,490 @@ async function paymentMethodsPage(){
 async function addUserPaymentMethod(){
 
   const method = prompt(
-    "اكتب نوع وسيلة الدفع:\nVisa / Wallet / Fawry / Aman"
+    "اختر وسيلة الدفع:\n\n" +
+    "1 - Visa\n" +
+    "2 - Wallet\n" +
+    "3 - Fawry\n" +
+    "4 - Aman"
   );
 
-  if(!method || !method.trim())
+  if(!method) return;
+
+  let methodName = "";
+  let details = "";
+
+  if(method === "1"){
+
+    const cardNumber = prompt("أدخل رقم البطاقة:");
+    if(!cardNumber) return;
+
+    const cvv = prompt("أدخل CVV:");
+    if(!cvv) return;
+
+    const expiry = prompt("أدخل تاريخ انتهاء البطاقة (MM/YY):");
+    if(!expiry) return;
+
+    methodName = "Visa";
+
+    details = JSON.stringify({
+      card_number: cardNumber,
+      cvv: cvv,
+      expiry: expiry
+    });
+
+  }
+
+  else if(method === "2"){
+
+    const walletNumber = prompt(
+      "أدخل رقم المحفظة:"
+    );
+
+    if(!walletNumber) return;
+
+    methodName = "Wallet";
+
+    details = JSON.stringify({
+      wallet_number: walletNumber
+    });
+
+  }
+
+  else if(method === "3"){
+
+    alert(
+      "Fawry غير متاحة حاليًا.\n" +
+      "سيتم توفيرها قريبًا."
+    );
+
     return;
 
-  const details = prompt(
-    "اكتب رقم أو بيانات وسيلة الدفع:"
-  );
+  }
 
-  if(!details || !details.trim())
+  else if(method === "4"){
+
+    alert(
+      "Aman غير متاحة حاليًا.\n" +
+      "سيتم توفيرها قريبًا."
+    );
+
     return;
+
+  }
+
+  else{
+
+    alert("اختيار غير صحيح.");
+    return;
+
+  }
+
 
   const { error } = await sb
     .from("user_payment_methods")
     .insert({
       user_id: state.user.id,
-      method_name: method.trim(),
-      payment_details: details.trim()
+      method_name: methodName,
+      payment_details: details
     });
 
+
   if(error){
+
     alert(error.message);
     return;
+
   }
+
 
   state.page = "paymentMethods";
 
   await render();
+
 }
 
 
 
 
-async function deleteUserPaymentMethod(id){
 
-  if(!confirm("هل تريد حذف وسيلة الدفع دي؟"))
-    return;
 
-  const { error } = await sb
-    .from("user_payment_methods")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", state.user.id);
 
-  if(error){
-    alert(error.message);
-    return;
-  }
+function showAddPaymentMethodForm(){
 
-  state.page = "paymentMethods";
+  const form = document.createElement("div");
 
-  await render();
+  form.innerHTML = `
+    <div style="
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.45);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+      direction:rtl;
+    ">
+
+      <div style="
+        background:#fff;
+        width:min(500px,92%);
+        border-radius:18px;
+        padding:25px;
+        box-shadow:0 15px 40px rgba(0,0,0,.2);
+      ">
+
+        <h2 style="margin-top:0;">
+          إضافة وسيلة دفع
+        </h2>
+
+        <label style="display:block;margin-bottom:8px;">
+          نوع وسيلة الدفع
+        </label>
+
+        <select
+          id="newPaymentType"
+          style="
+            width:100%;
+            padding:13px;
+            border:1px solid #ddd;
+            border-radius:10px;
+            margin-bottom:18px;
+          "
+          onchange="changePaymentForm()"
+        >
+          <option value="">اختر وسيلة الدفع</option>
+          <option value="Visa">Visa</option>
+          <option value="Wallet">Wallet</option>
+          <option value="Fawry">Fawry</option>
+          <option value="Aman">Aman</option>
+        </select>
+
+        <div id="paymentFields"></div>
+
+        <div style="
+          display:flex;
+          gap:10px;
+          margin-top:20px;
+        ">
+
+          <button
+            class="btn primary"
+            style="flex:1"
+            onclick="saveNewPaymentMethod()"
+          >
+            حفظ
+          </button>
+
+          <button
+            class="btn"
+            style="flex:1"
+            onclick="this.closest('div[style*=fixed]').remove()"
+          >
+            إلغاء
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+  `;
+
+  document.body.appendChild(form);
 }
 
 
+function changePaymentForm(){
 
-async function addUserPaymentMethod(){
+  const type = document.getElementById("newPaymentType")?.value;
+  const box = document.getElementById("paymentFields");
 
-  const method = prompt(
-    "اكتب نوع وسيلة الدفع:\nVisa / Wallet / Fawry / Aman"
-  );
+  if(!box) return;
 
-  if(!method || !method.trim())
+  if(type === "Visa"){
+
+    box.innerHTML = `
+
+      <label>رقم البطاقة</label>
+
+      <input
+        id="cardNumber"
+        type="text"
+        inputmode="numeric"
+        maxlength="19"
+        placeholder="1234 5678 9012 3456"
+        style="
+          width:100%;
+          padding:13px;
+          margin:7px 0 15px;
+          border:1px solid #ddd;
+          border-radius:10px;
+          box-sizing:border-box;
+        "
+      >
+
+      <div style="
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:12px;
+      ">
+
+        <div>
+
+          <label>تاريخ الانتهاء</label>
+
+          <input
+            id="cardExpiry"
+            type="text"
+            maxlength="5"
+            placeholder="MM/YY"
+            style="
+              width:100%;
+              padding:13px;
+              margin-top:7px;
+              border:1px solid #ddd;
+              border-radius:10px;
+              box-sizing:border-box;
+            "
+          >
+
+        </div>
+
+        <div>
+
+          <label>CVV</label>
+
+          <input
+            id="cardCvv"
+            type="password"
+            inputmode="numeric"
+            maxlength="4"
+            placeholder="CVV"
+            style="
+              width:100%;
+              padding:13px;
+              margin-top:7px;
+              border:1px solid #ddd;
+              border-radius:10px;
+              box-sizing:border-box;
+            "
+          >
+
+        </div>
+
+      </div>
+
+      <small style="
+        display:block;
+        color:#777;
+        margin-top:12px;
+      ">
+        لن يتم حفظ CVV في قاعدة البيانات.
+      </small>
+    `;
+
+  }
+
+  else if(type === "Wallet"){
+
+    box.innerHTML = `
+
+      <label>رقم المحفظة</label>
+
+      <input
+        id="walletNumber"
+        type="tel"
+        inputmode="numeric"
+        maxlength="11"
+        placeholder="01xxxxxxxxx"
+        style="
+          width:100%;
+          padding:13px;
+          margin-top:7px;
+          border:1px solid #ddd;
+          border-radius:10px;
+          box-sizing:border-box;
+        "
+      >
+
+    `;
+
+  }
+
+  else if(type === "Fawry" || type === "Aman"){
+
+    box.innerHTML = `
+
+      <div style="
+        background:#fff8e1;
+        border:1px solid #f0d98c;
+        border-radius:10px;
+        padding:15px;
+        margin-top:10px;
+        color:#856404;
+      ">
+        ⚠️ وسيلة الدفع دي غير متاحة حاليًا.
+        <br>
+        سيتم توفيرها قريبًا.
+      </div>
+
+    `;
+
+  }
+
+  else{
+
+    box.innerHTML = "";
+
+  }
+}
+
+
+async function saveNewPaymentMethod(){
+
+  const type =
+    document.getElementById("newPaymentType")?.value;
+
+  if(!type){
+
+    alert("اختر وسيلة الدفع أولاً.");
     return;
 
-  const details = prompt(
-    "اكتب رقم أو بيانات وسيلة الدفع:"
-  );
+  }
 
-  if(!details || !details.trim())
+
+  if(type === "Fawry" || type === "Aman"){
+
+    alert("وسيلة الدفع دي غير متاحة حاليًا.");
     return;
+
+  }
+
+
+  let details = {};
+
+
+  if(type === "Visa"){
+
+    const cardNumber =
+      document.getElementById("cardNumber")?.value.trim();
+
+    const expiry =
+      document.getElementById("cardExpiry")?.value.trim();
+
+    const cvv =
+      document.getElementById("cardCvv")?.value.trim();
+
+
+    if(!cardNumber || !expiry || !cvv){
+
+      alert("أكمل بيانات البطاقة.");
+      return;
+
+    }
+
+
+    const cleanNumber =
+      cardNumber.replace(/\s/g,"");
+
+
+    if(!/^\d{16}$/.test(cleanNumber)){
+
+      alert("رقم البطاقة يجب أن يكون 16 رقم.");
+      return;
+
+    }
+
+
+    if(!/^\d{2}\/\d{2}$/.test(expiry)){
+
+      alert("اكتب تاريخ الانتهاء بالشكل MM/YY.");
+      return;
+
+    }
+
+
+    if(!/^\d{3,4}$/.test(cvv)){
+
+      alert("CVV غير صحيح.");
+      return;
+
+    }
+
+
+    details = {
+
+      card_last4:
+        cleanNumber.slice(-4),
+
+      expiry: expiry
+
+    };
+
+  }
+
+
+  else if(type === "Wallet"){
+
+    const wallet =
+      document.getElementById("walletNumber")?.value.trim();
+
+
+    if(!wallet){
+
+      alert("اكتب رقم المحفظة.");
+      return;
+
+    }
+
+
+    if(!/^01\d{9}$/.test(wallet)){
+
+      alert("رقم المحفظة يجب أن يكون رقم هاتف مصري صحيح.");
+      return;
+
+    }
+
+
+    details = {
+
+      wallet_number: wallet
+
+    };
+
+  }
+
 
   const { error } = await sb
     .from("user_payment_methods")
     .insert({
+
       user_id: state.user.id,
-      method_name: method.trim(),
-      payment_details: details.trim()
+
+      method_name: type,
+
+      payment_details: JSON.stringify(details)
+
     });
 
+
   if(error){
+
     alert(error.message);
     return;
+
   }
+
+
+  document
+    .querySelector('div[style*="position:fixed"]')
+    ?.remove();
+
 
   state.page = "paymentMethods";
 
   await render();
+
 }
 
 
