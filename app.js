@@ -3881,7 +3881,7 @@ function filterReceptionBookings(){
 }
 
 
-async function receptionistConfirmBooking(bookingId){
+async function receptionistConfirmBooking(id){
 
   if(!confirm("تأكيد هذا الحجز؟"))
     return;
@@ -3889,9 +3889,9 @@ async function receptionistConfirmBooking(bookingId){
   const { error } = await sb
     .from("bookings")
     .update({
-      booking_status:"Confirmed"
+      booking_status:"confirmed"
     })
-    .eq("booking_id", bookingId);
+    .eq("id",id);
 
   if(error){
 
@@ -3905,7 +3905,8 @@ async function receptionistConfirmBooking(bookingId){
   await render();
 }
 
-async function receptionistCancelBooking(bookingId){
+
+async function receptionistCancelBooking(id){
 
   if(!confirm("هل تريد إلغاء هذا الحجز؟"))
     return;
@@ -3913,9 +3914,9 @@ async function receptionistCancelBooking(bookingId){
   const { error } = await sb
     .from("bookings")
     .update({
-      booking_status:"Cancelled"
+      booking_status:"cancelled"
     })
-    .eq("booking_id", bookingId);
+    .eq("id",id);
 
   if(error){
 
@@ -3938,7 +3939,7 @@ async function receptionistAvailability(){
     state.receptionDate || today;
 
   const { data: fields, error: fieldsError } = await sb
-    .from(".from("sports_fields")")
+    .from("fields")
     .select("*")
     .order("id", { ascending:true });
 
