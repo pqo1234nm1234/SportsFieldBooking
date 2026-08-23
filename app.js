@@ -69,7 +69,23 @@ function fieldsPage(){return shell(`<h1 class="title">الملاعب المتا�
 function fieldRows(arr){return arr.map(f=>`<div class="listrow"><img src="${esc(f.image_url)}"><div><b>${esc(f.field_name)}</b><p class="muted">النوع: ${esc(f.field_type)} | الموقع: ${esc(f.location)}</p></div><b class="price">${money(f.price)} / ساعة</b><button class="btn primary" onclick="selectField(${f.field_id})">احجز الآن</button></div>`).join("")||"<p>لا توجد نتائج.</p>"}
 function filterFields(){const q=document.querySelector("#search").value.toLowerCase(),t=document.querySelector("#typeFilter").value;document.querySelector("#fieldList").innerHTML=fieldRows(state.fields.filter(f=>(f.field_name.toLowerCase().includes(q)||f.location.toLowerCase().includes(q))&&(!t||f.field_type===t)))}
 function booking(){const f=state.field;if(!f)return fieldsPage();return shell(`<h1 class="title">شاشة اختيار التاريخ والوقت</h1><div class="calendarLayout"><section class="section"><img class="fieldimg" src="${esc(f.image_url)}"><div class="info"><div><b>الموقع</b><span>${esc(f.location)}</span></div><div><b>النوع</b><span>${esc(f.field_type)}</span></div><div><b>السعر</b><span class="price">${money(f.price)} / ساعة</span></div></div></section><section class="section"><h2>حجز ${esc(f.field_name)}</h2><label>اختر التاريخ</label><input id="bookDate" class="input" type="date" min="${new Date().toISOString().slice(0,10)}" value="${state.date}" onchange="state.date=this.value">
-<div class="times"><div><label>وقت البداية</label><input id="start" class="input" type="time" value="${state.start}" onchange="state.start=this.value"></div><div><label>وقت النهاية</label><input id="end" class="input" type="time" value="${state.end}" onchange="state.end=this.value"></div></div>
+<div class="times">
+  <div>
+    <label>وقت البداية</label>
+    <div class="time-input-wrap">
+      <span class="time-arrow">↕</span>
+      <input id="start" class="input" type="time" value="${state.start}" onchange="state.start=this.value">
+    </div>
+  </div>
+
+  <div>
+    <label>وقت النهاية</label>
+    <div class="time-input-wrap">
+      <span class="time-arrow">↕</span>
+      <input id="end" class="input" type="time" value="${state.end}" onchange="state.end=this.value">
+    </div>
+  </div>
+</div>
 <button class="btn primary full" style="margin-top:18px" onclick="checkAvailability()">تحقق من التوفر</button></section></div>`)}
 async function checkAvailability(){
  state.date=document.querySelector("#bookDate").value;state.start=document.querySelector("#start").value;state.end=document.querySelector("#end").value;
