@@ -12,7 +12,8 @@ let sb=null,state={
   start:"",
   end:"",
   pay:"Card",
-  available:null
+  available:null,
+  manager:false
 };
 
 const app=document.querySelector("#app");
@@ -150,10 +151,16 @@ async function login(){
 
   state.user=data.user;
 
-  await loadProfile();
-  await loadFields();
+await loadProfile();
+await loadFields();
 
+if(state.profile?.role==="manager"){
+  state.manager=true;
+  go("manager");
+}else{
+  state.manager=false;
   go("dashboard");
+}
 }
 
 async function logout(){
@@ -245,6 +252,22 @@ function auth(mode){
 }
 
 function side(){
+
+  const isManager=state.profile?.role==="manager";
+
+  const menu=isManager
+    ? [
+        ["manager","لوحة المدير"],
+        ["fields","الملاعب"]
+      ]
+    : [
+        ["dashboard","الرئيسية"],
+        ["fields","الملاعب"],
+        ["bookings","حجوزاتي"],
+        ["payment","المدفوعات"],
+        ["profile","الملف الشخصي"]
+      ];
+
   return `
     <aside class="side">
 
@@ -256,22 +279,14 @@ function side(){
       <nav class="nav">
 
         ${
-          [
-            ["dashboard","الرئيسية"],
-            ["fields","الملاعب"],
-            ["bookings","حجوزاتي"],
-            ["payment","المدفوعات"],
-            ["profile","الملف الشخصي"]
-          ]
-          .map(x=>`
+          menu.map(x=>`
             <button
               class="${state.page===x[0]?"active":""}"
               onclick="go('${x[0]}')"
             >
               ${x[1]}
             </button>
-          `)
-          .join("")
+          `).join("")
         }
 
         <button onclick="logout()">
@@ -279,6 +294,7 @@ function side(){
         </button>
 
       </nav>
+
     </aside>
   `;
 }
@@ -1369,6 +1385,235 @@ function success(){
   `);
 }
 
+async function managerDashboard(){
+
+  if(state.profile?.role!=="manager"){
+    state.page="dashboard";
+    return dashboard();
+  }
+
+  const {data:rows,error}=await sb
+    .from("bookings")
+    .select(`
+      booking_id,
+      customer_id,
+      booking_date,
+      start_time,
+      end_time,
+      booking_status,
+      sports_fields(field_name,price)
+    `)
+    .order("booking_date",{ascending:false});
+
+  if(error){
+    return shell(`
+      <h1 class="title">لوحة المدير</h1>
+      <section class="section">
+        <p>${esc(error.message)}</p>
+      </section>
+    `);
+  }
+
+  const bookings=rows||[];
+
+  const confirmed=bookings.filter(
+    b=>b.booking_status==="Confirmed"
+  ).length;
+
+  const pending=bookings.filter(
+    b=>b.booking_status==="Pending"
+  ).length;
+
+  const cancelled=bookings.filter(
+    b=>b.booking_status==="Cancelled"
+  ).length;
+
+  const fieldMap={};
+
+  bookings.forEach(b=>{
+    const name=b.sports_fields?.field_name||"غير محدد";
+    fieldMap[name]=(fieldMap[name]||0)+1;
+  });
+
+  const topFields=Object.entries(fieldMap)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,5);
+
+  const max=Math.max(
+    ...topFields.map(x=>x[1]),
+    1
+  );
+
+  return shell(`
+
+    <h1 class="title">
+      لوحة تحكم المدير
+    </h1>
+
+    <div class="grid4">
+
+      ${stat(
+        bookings.length,
+        "إجمالي الحجوزات"
+      )}
+
+      ${stat(
+        confirmed,
+        "حجوزات مؤكدة"
+      )}
+
+      ${stat(
+        pending,
+        "حجوزات معلقة"
+      )}
+
+      ${stat(
+        cancelled,
+        "حجوزات ملغاة"
+      )}
+
+    </div>
+
+    <div
+      class="grid2"
+      style="margin-top:18px"
+    >
+
+      <section class="section">
+
+        <h2>
+          أكثر الملاعب حجزاً
+        </h2>
+
+        ${
+          topFields.length
+          ?
+          topFields.map(([name,count],i)=>`
+
+            <div style="margin-top:20px">
+
+              <div style="
+                display:flex;
+                justify-content:space-between;
+                margin-bottom:7px;
+              ">
+
+                <b>
+                  ${i+1}.
+                  ${esc(name)}
+                </b>
+
+                <span>
+                  ${count}
+                </span>
+
+              </div>
+
+              <div style="
+                height:10px;
+                background:#eee;
+                border-radius:10px;
+                overflow:hidden;
+              ">
+
+                <div style="
+                  width:${(count/max)*100}%;
+                  height:100%;
+                  background:#27ae60;
+                "></div>
+
+              </div>
+
+            </div>
+
+          `).join("")
+          :
+          `<p class="muted">لا توجد حجوزات.</p>`
+        }
+
+      </section>
+
+      <section class="section">
+
+        <h2>
+          أحدث الحجوزات
+        </h2>
+
+        <div style="overflow:auto">
+
+          <table class="table">
+
+            <tr>
+              <th>رقم الحجز</th>
+              <th>الملعب</th>
+              <th>التاريخ</th>
+              <th>الوقت</th>
+              <th>الحالة</th>
+            </tr>
+
+            ${
+              bookings.slice(0,8).map(b=>`
+
+                <tr>
+
+                  <td>
+                    BK${String(
+                      b.booking_id
+                    ).padStart(6,"0")}
+                  </td>
+
+                  <td>
+                    ${esc(
+                      b.sports_fields?.field_name||
+                      "غير محدد"
+                    )}
+                  </td>
+
+                  <td>
+                    ${b.booking_date}
+                  </td>
+
+                  <td>
+                    ${b.start_time} -
+                    ${b.end_time}
+                  </td>
+
+                  <td>
+                    ${
+                      b.booking_status==="Confirmed"
+                      ?
+                      `<span class="badge ok">مؤكد</span>`
+                      :
+                      b.booking_status==="Pending"
+                      ?
+                      `<span class="badge">معلق</span>`
+                      :
+                      `<span class="badge">ملغي</span>`
+                    }
+                  </td>
+
+                </tr>
+
+              `).join("")
+              ||
+              `<tr>
+                <td colspan="5">
+                  لا توجد حجوزات.
+                </td>
+              </tr>`
+            }
+
+          </table>
+
+        </div>
+
+      </section>
+
+    </div>
+
+  `);
+}
+
 async function bookings(){
 
   const {data,error}=await sb
@@ -1517,6 +1762,51 @@ async function render(){
     state.page="login";
     app.innerHTML=auth("login");
     return;
+  }
+
+  /* =========================
+     MANAGER AREA
+     ========================= */
+
+  if(state.page==="manager"){
+
+    if(state.profile?.role==="manager"){
+      app.innerHTML=await managerDashboard();
+    }else{
+      state.page="dashboard";
+      app.innerHTML=await dashboard();
+    }
+
+    return;
+  }
+
+  /* =========================
+     CUSTOMER AREA
+     ========================= */
+
+  if(state.profile?.role==="manager"){
+
+    /*
+      لو المدير حاول يفتح صفحة من صفحات العميل
+      يرجعه تلقائياً إلى لوحة المدير
+    */
+
+    const customerPages=[
+      "dashboard",
+      "bookings",
+      "payment",
+      "profile",
+      "availability",
+      "success",
+      "booking"
+    ];
+
+    if(customerPages.includes(state.page)){
+      state.page="manager";
+      app.innerHTML=await managerDashboard();
+      return;
+    }
+
   }
 
   if(state.page==="dashboard")
