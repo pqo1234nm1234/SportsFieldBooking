@@ -15,3 +15,238 @@
   pointer-events: none;
   z-index: 2;
 }
+
+
+
+/* =========================================
+   CUSTOMER HOME
+   ========================================= */
+
+.customer-welcome{
+  background:#fff;
+  border:1px solid #e1e6e4;
+  border-radius:14px;
+  padding:25px 30px;
+  margin-bottom:20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  direction:rtl;
+}
+
+.customer-welcome h2{
+  margin:0 0 8px;
+  font-size:22px;
+}
+
+.customer-welcome p{
+  margin:0;
+  color:#777;
+}
+
+.customer-avatar{
+  width:58px;
+  height:58px;
+  border-radius:50%;
+  background:#e9f6ed;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:30px;
+}
+
+
+/* =========================================
+   STATS
+   ========================================= */
+
+.customer-stats{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:18px;
+  margin-bottom:28px;
+  direction:rtl;
+}
+
+.customer-stat{
+  background:#fff;
+  border:1px solid #e1e6e4;
+  border-radius:14px;
+  padding:22px 15px;
+  text-align:center;
+  min-height:135px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+}
+
+.stat-icon{
+  font-size:25px;
+  margin-bottom:8px;
+}
+
+.stat-icon.blue{
+  color:#1265c5;
+}
+
+.stat-icon.green{
+  color:#179447;
+}
+
+.stat-icon.wallet{
+  color:#168b47;
+}
+
+.stat-icon.orange{
+  color:#e39b16;
+}
+
+.stat-number{
+  font-size:25px;
+  font-weight:700;
+  color:#149447;
+  margin-bottom:6px;
+}
+
+.stat-label{
+  font-size:16px;
+}
+
+
+/* =========================================
+   AVAILABLE FIELDS
+   ========================================= */
+
+.customer-fields-section{
+  background:#fff;
+  border:1px solid #e1e6e4;
+  border-radius:14px;
+  padding:22px;
+  direction:rtl;
+}
+
+.section-heading{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:18px;
+}
+
+.section-heading h2{
+  margin:0;
+  font-size:24px;
+}
+
+.show-all-btn{
+  border:0;
+  background:none;
+  color:#159447;
+  font-size:16px;
+  font-weight:600;
+  cursor:pointer;
+}
+
+
+/* =========================================
+   FIELD GRID
+   ========================================= */
+
+.customer-fields-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:20px;
+}
+
+.field-card{
+  background:#fff;
+  border:1px solid #e1e6e4;
+  border-radius:12px;
+  overflow:hidden;
+  transition:.2s;
+}
+
+.field-card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 5px 18px rgba(0,0,0,.08);
+}
+
+.field-image{
+  width:100%;
+  height:160px;
+  overflow:hidden;
+}
+
+.field-image img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+.field-card-body{
+  padding:15px;
+}
+
+.field-card-body h3{
+  margin:0 0 7px;
+  font-size:19px;
+}
+
+.field-type{
+  margin:0 0 14px;
+  color:#777;
+}
+
+.field-bottom{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.field-bottom strong{
+  color:#159447;
+  font-size:16px;
+}
+
+.book-icon{
+  border:0;
+  background:none;
+  font-size:22px;
+  cursor:pointer;
+}
+
+.empty-fields{
+  text-align:center;
+  padding:30px;
+  color:#777;
+}
+
+
+/* =========================================
+   RESPONSIVE
+   ========================================= */
+
+@media(max-width:900px){
+
+  .customer-stats{
+    grid-template-columns:repeat(2,1fr);
+  }
+
+  .customer-fields-grid{
+    grid-template-columns:1fr;
+  }
+
+}
+
+@media(max-width:600px){
+
+  .customer-stats{
+    grid-template-columns:1fr;
+  }
+
+  .customer-welcome{
+    padding:18px;
+  }
+
+}
