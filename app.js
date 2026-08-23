@@ -3242,8 +3242,8 @@ if(isManager){
   }
 
   else if(state.page==="payment"){
-    app.innerHTML=payment();
-  }
+  app.innerHTML=await payment();
+}
      else if(state.page==="paymentMethods"){
   app.innerHTML=await paymentMethodsPage();
      }
