@@ -905,22 +905,17 @@ function booking(){
               وقت البداية
             </label>
 
-            <div class="time-input-wrap">
+           <div class="time-input-wrap">
 
-              <span class="time-arrow">
-                ↕
-              </span>
+  <input
+    id="start"
+    class="input"
+    type="time"
+    value="${state.start}"
+    onchange="state.start=this.value"
+  >
 
-              <input
-                id="start"
-                class="input"
-                type="time"
-                value="${state.start}"
-                onchange="state.start=this.value"
-              >
-
-            </div>
-
+</div>
           </div>
 
 
@@ -930,22 +925,17 @@ function booking(){
               وقت النهاية
             </label>
 
-            <div class="time-input-wrap">
+           <div class="time-input-wrap">
 
-              <span class="time-arrow">
-                ↕
-              </span>
+  <input
+    id="end"
+    class="input"
+    type="time"
+    value="${state.end}"
+    onchange="state.end=this.value"
+  >
 
-              <input
-                id="end"
-                class="input"
-                type="time"
-                value="${state.end}"
-                onchange="state.end=this.value"
-              >
-
-            </div>
-
+</div>
           </div>
 
         </div>
@@ -1279,7 +1269,33 @@ async function payment(){
                   color:#777;
                   margin-top:4px;
                 ">
-                  ${esc(m.payment_details)}
+                  ${
+  (() => {
+    try {
+      const d = JSON.parse(m.payment_details || "{}");
+
+      if(m.method_name === "Visa"){
+        return `
+          •••• ${esc(d.card_last4 || "")}
+          ${
+            d.expiry
+              ? ` — انتهاء ${esc(d.expiry)}`
+              : ""
+          }
+        `;
+      }
+
+      if(m.method_name === "Wallet"){
+        return esc(d.wallet_number || "");
+      }
+
+      return esc(m.payment_details);
+
+    } catch(e) {
+      return esc(m.payment_details);
+    }
+  })()
+}
                 </small>
               </span>
 
