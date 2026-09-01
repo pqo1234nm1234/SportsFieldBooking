@@ -774,6 +774,182 @@ function fieldsPage(){
     </section>
   `);
 }
+async function managerFieldsPage(){
+
+  const {data:fields,error}=await sb
+    .from("sports_fields")
+    .select("*")
+    .order("field_id",{ascending:true});
+
+  if(error){
+    return shell(`
+      <h1 class="title">إدارة الملاعب</h1>
+      <section class="section">
+        <p>${esc(error.message)}</p>
+      </section>
+    `);
+  }
+
+  return shell(`
+
+    <h1 class="title">
+      إدارة الملاعب
+    </h1>
+
+    <section class="section">
+
+      <h2>إضافة ملعب جديد</h2>
+
+      <div class="form">
+
+        <input
+          id="newFieldName"
+          class="input"
+          placeholder="اسم الملعب"
+        >
+
+        <select id="newFieldType">
+          <option value="خارجي">خارجي</option>
+          <option value="داخلي">داخلي</option>
+        </select>
+
+        <input
+          id="newFieldLocation"
+          class="input"
+          placeholder="موقع الملعب"
+        >
+
+        <input
+          id="newFieldPrice"
+          class="input"
+          type="number"
+          min="0"
+          placeholder="السعر لكل ساعة"
+        >
+
+        <input
+          id="newFieldImage"
+          class="input"
+          placeholder="رابط صورة الملعب"
+        >
+
+        <button
+          class="btn primary"
+          onclick="addManagerField()"
+        >
+          + إضافة الملعب
+        </button>
+
+      </div>
+
+    </section>
+
+
+    <section class="section">
+
+      <h2>الملاعب الموجودة</h2>
+
+      <div class="list">
+
+        ${
+          fields.length
+          ?
+          fields.map(f=>`
+
+            <div class="listrow">
+
+              <img
+                src="${esc(f.image_url || "")}"
+                style="
+                  width:110px;
+                  height:75px;
+                  object-fit:cover;
+                  border-radius:10px;
+                "
+              >
+
+              <div style="flex:1">
+
+                <b>
+                  ${esc(f.field_name)}
+                </b>
+
+                <p class="muted">
+                  النوع: ${esc(f.field_type)}
+                  |
+                  الموقع: ${esc(f.location)}
+                </p>
+
+              </div>
+
+              <b class="price">
+                ${money(f.price)} / ساعة
+              </b>
+
+            </div>
+
+          `).join("")
+
+          :
+
+          `<p>لا توجد ملاعب حالياً.</p>`
+        }
+
+      </div>
+
+    </section>
+
+  `);
+}
+async function addManagerField(){
+
+  const field_name =
+    document.querySelector("#newFieldName").value.trim();
+
+  const field_type =
+    document.querySelector("#newFieldType").value;
+
+  const location =
+    document.querySelector("#newFieldLocation").value.trim();
+
+  const price =
+    Number(document.querySelector("#newFieldPrice").value);
+
+  const image_url =
+    document.querySelector("#newFieldImage").value.trim();
+
+  if(!field_name || !location || !price || !image_url){
+
+    alert("من فضلك أكمل بيانات الملعب");
+    return;
+
+  }
+
+  const {error}=await sb
+    .from("sports_fields")
+    .insert({
+      field_name,
+      field_type,
+      location,
+      price,
+      image_url
+    });
+
+  if(error){
+
+    alert(error.message);
+    return;
+
+  }
+
+  alert("تم إضافة الملعب بنجاح");
+
+  await loadFields();
+
+  state.page="fields";
+
+  await render();
+}
 
 function fieldRows(arr){
   return arr.map(f=>`
@@ -4377,9 +4553,9 @@ async function render(){
       app.innerHTML=await managerBookings();
     }
 
-    else if(state.page==="fields"){
-      app.innerHTML=fieldsPage();
-    }
+   else if(state.page==="fields"){
+  app.innerHTML=await managerFieldsPage();
+}
 
     else if(state.page==="profile"){
       app.innerHTML=await managerCustomers();
