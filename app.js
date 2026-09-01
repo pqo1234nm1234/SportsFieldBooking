@@ -128,6 +128,9 @@ async function signup(){
 
   if(error)
     return note(error.message);
+  if(data.user && data.user.identities && data.user.identities.length === 0)
+  return note("هذا الحساب موجود بالفعل");
+
 
   if(data.session){
     state.user=data.user;
