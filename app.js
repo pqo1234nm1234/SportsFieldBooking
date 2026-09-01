@@ -89,9 +89,10 @@ async function loadProfile(){
 
 async function loadFields(){
   const {data,error}=await sb
-    .from("sports_fields")
-    .select("*")
-    .order("field_id");
+  .from("sports_fields")
+  .select("*")
+  .eq("is_deleted", false)
+  .order("field_id");
 
   if(!error)
     state.fields=data||[];
@@ -486,10 +487,10 @@ async function dashboard(){
      GET SPORTS FIELDS
      ========================= */
 
-  const { data: fieldsData } = await sb
-    .from("sports_fields")
-    .select("*");
-
+ const { data: fieldsData } = await sb
+  .from("sports_fields")
+  .select("*")
+  .eq("is_deleted", false);
   const fields = fieldsData || [];
 
   /* =========================
