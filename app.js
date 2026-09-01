@@ -776,11 +776,11 @@ function fieldsPage(){
 }
 async function managerFieldsPage(){
 
-  const {data:fields,error}=await sb
-    .from("sports_fields")
-    .select("*")
-    .order("field_id",{ascending:true});
-
+ const {data:fields,error}=await sb
+  .from("sports_fields")
+  .select("*")
+  .eq("is_deleted", false)
+  .order("field_id",{ascending:true});
   if(error){
     return shell(`
       <h1 class="title">إدارة الملاعب</h1>
