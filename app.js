@@ -798,9 +798,24 @@ async function managerFieldsPage(){
 
     <section class="section">
 
-      <h2>إضافة ملعب جديد</h2>
+      <button
+        class="btn primary"
+        onclick="
+          const box=document.querySelector('#addFieldBox');
+          box.style.display =
+            box.style.display==='none'
+            ? 'block'
+            : 'none';
+        "
+      >
+        ➕ إضافة ملعب
+        <span style="margin-right:8px">⌄</span>
+      </button>
 
-      <div class="form">
+      <div
+        id="addFieldBox"
+        style="display:none;margin-top:20px"
+      >
 
         <input
           id="newFieldName"
@@ -808,7 +823,10 @@ async function managerFieldsPage(){
           placeholder="اسم الملعب"
         >
 
-        <select id="newFieldType">
+        <select
+          id="newFieldType"
+          style="margin-top:10px"
+        >
           <option value="خارجي">خارجي</option>
           <option value="داخلي">داخلي</option>
         </select>
@@ -817,6 +835,7 @@ async function managerFieldsPage(){
           id="newFieldLocation"
           class="input"
           placeholder="موقع الملعب"
+          style="margin-top:10px"
         >
 
         <input
@@ -825,25 +844,28 @@ async function managerFieldsPage(){
           type="number"
           min="0"
           placeholder="السعر لكل ساعة"
+          style="margin-top:10px"
         >
 
         <input
           id="newFieldImage"
           class="input"
-          placeholder="رابط صورة الملعب"
+          type="file"
+          accept="image/*"
+          style="margin-top:10px"
         >
 
         <button
           class="btn primary"
           onclick="addManagerField()"
+          style="margin-top:15px"
         >
-          + إضافة الملعب
+          إضافة الملعب
         </button>
 
       </div>
 
     </section>
-
 
     <section class="section">
 
@@ -901,6 +923,8 @@ async function managerFieldsPage(){
 
   `);
 }
+
+
 async function addManagerField(){
 
   const field_name =
@@ -915,15 +939,60 @@ async function addManagerField(){
   const price =
     Number(document.querySelector("#newFieldPrice").value);
 
-  const image_url =
-    document.querySelector("#newFieldImage").value.trim();
+  const file =
+    document.querySelector("#newFieldImage").files[0];
 
-  if(!field_name || !location || !price || !image_url){
 
-    alert("من فضلك أكمل بيانات الملعب");
+  if(!field_name || !location || !price || !file){
+
+    alert("من فضلك أكمل بيانات الملعب واختر صورة");
     return;
 
   }
+
+
+  /* رفع الصورة */
+
+  const ext =
+    file.name.split(".").pop();
+
+  const fileName =
+    `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+  const filePath =
+    `fields/${fileName}`;
+
+
+  const {error:uploadError}=await sb
+    .storage
+    .from("field-images")
+    .upload(filePath,file,{
+      contentType:file.type,
+      upsert:false
+    });
+
+
+  if(uploadError){
+
+    alert(uploadError.message);
+    return;
+
+  }
+
+
+  /* الحصول على رابط الصورة */
+
+  const {data:urlData}=sb
+    .storage
+    .from("field-images")
+    .getPublicUrl(filePath);
+
+
+  const image_url =
+    urlData.publicUrl;
+
+
+  /* إضافة بيانات الملعب */
 
   const {error}=await sb
     .from("sports_fields")
@@ -935,12 +1004,14 @@ async function addManagerField(){
       image_url
     });
 
+
   if(error){
 
     alert(error.message);
     return;
 
   }
+
 
   alert("تم إضافة الملعب بنجاح");
 
@@ -949,6 +1020,7 @@ async function addManagerField(){
   state.page="fields";
 
   await render();
+
 }
 
 function fieldRows(arr){
