@@ -905,9 +905,16 @@ async function managerFieldsPage(){
               </div>
 
               <b class="price">
-                ${money(f.price)} / ساعة
-              </b>
+  ${money(f.price)} / ساعة
+</b>
 
+<button
+  class="btn danger"
+  onclick="deleteManagerField(${f.field_id})"
+  style="margin-right:15px"
+>
+  🗑️ حذف
+</button>
             </div>
 
           `).join("")
@@ -923,7 +930,28 @@ async function managerFieldsPage(){
 
   `);
 }
+async function deleteManagerField(fieldId){
 
+  if(!confirm("هل أنت متأكد من حذف هذا الملعب؟")){
+    return;
+  }
+
+  const { error } = await sb
+    .from("sports_fields")
+    .update({
+      is_deleted: true
+    })
+    .eq("field_id", fieldId);
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  alert("تم حذف الملعب بنجاح");
+
+  await render();
+}
 
 async function addManagerField(){
 
