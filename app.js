@@ -2471,6 +2471,7 @@ async function bookings(){
             <th>التاريخ</th>
             <th>الوقت</th>
             <th>الحالة</th>
+            <th>الإجراء</th>
           </tr>
 
           ${
@@ -2498,10 +2499,27 @@ async function bookings(){
                 </td>
 
                 <td>
-
                   <span class="badge ok">
                     ${b.booking_status}
                   </span>
+                </td>
+
+                <td>
+
+                  ${
+                    b.booking_status === "Confirmed"
+                    ?
+                    `
+                      <button
+                        class="btn danger"
+                        onclick="cancelMyBooking(${b.booking_id})"
+                      >
+                        إلغاء الحجز
+                      </button>
+                    `
+                    :
+                    ""
+                  }
 
                 </td>
 
@@ -2511,7 +2529,7 @@ async function bookings(){
             ||
             `
               <tr>
-                <td colspan="5">
+                <td colspan="6">
                   لا توجد حجوزات.
                 </td>
               </tr>
@@ -2523,7 +2541,32 @@ async function bookings(){
       </div>
 
     </section>
+
   `);
+}
+async function cancelMyBooking(bookingId){
+
+  if(!confirm("هل أنت متأكد أنك تريد إلغاء هذا الحجز؟")){
+    return;
+  }
+
+  const {error}=await sb
+    .from("bookings")
+    .update({
+      booking_status:"Cancelled"
+    })
+    .eq("booking_id",bookingId)
+    .eq("customer_id",state.user.id)
+    .eq("booking_status","Confirmed");
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  alert("تم إلغاء الحجز بنجاح");
+
+  await render();
 }
 
 async function profile(){
