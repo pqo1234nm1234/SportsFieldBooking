@@ -116,10 +116,15 @@ async function signup(){
     return note("تأكيد كلمة المرور غير مطابق");
 
   const {data,error}=await sb.auth.signUp({
-    email,
-    password:pass,
-    options:{data:{full_name:name}}
-  });
+  email,
+  password:pass,
+  options:{
+    data:{
+      full_name:name
+    },
+    emailRedirectTo:"https://pqo1234nm1234.github.io/SportsFieldBooking/"
+  }
+});
 
   if(error)
     return note(error.message);
