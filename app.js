@@ -936,19 +936,60 @@ async function deleteManagerField(fieldId){
     return;
   }
 
-  const { error } = await sb
+  // البحث عن الحجوزات الخاصة بالملعب
+  const {data:bookings,error:bookingError}=await sb
+    .from("bookings")
+    .select("booking_date,start_time,end_time,booking_status")
+    .eq("field_id",fieldId)
+    .neq("booking_status","Cancelled");
+
+  if(bookingError){
+    alert(bookingError.message);
+    return;
+  }
+
+  // معرفة هل يوجد حجز لم ينتهِ بعد
+  const now=new Date();
+
+  const activeBooking=bookings?.some(b=>{
+
+    const endDateTime=new Date(
+      `${b.booking_date}T${b.end_time}`
+    );
+
+    return endDateTime>now;
+
+  });
+
+  // إخفاء الملعب فوراً بدون حذف الحجوزات
+  const {error}=await sb
     .from("sports_fields")
     .update({
-      is_deleted: true
+      is_deleted:true
     })
-    .eq("field_id", fieldId);
+    .eq("field_id",fieldId);
 
   if(error){
     alert(error.message);
     return;
   }
 
-  alert("تم حذف الملعب بنجاح");
+  if(activeBooking){
+
+    alert(
+      "تم إخفاء الملعب من الموقع.\n\n" +
+      "الحجوزات الحالية ستظل موجودة ولن يتم إلغاؤها.\n" +
+      "سيتم حذف الملعب نهائياً بعد انتهاء آخر حجز."
+    );
+
+  }else{
+
+    alert(
+      "تم إخفاء الملعب.\n" +
+      "لا توجد حجوزات نشطة حالياً."
+    );
+
+  }
 
   await render();
 }
@@ -2546,11 +2587,48 @@ async function bookings(){
 }
 async function cancelMyBooking(bookingId){
 
-  if(!confirm("هل أنت متأكد أنك تريد إلغاء هذا الحجز؟")){
+  const {data:booking,error}=await sb
+    .from("bookings")
+    .select(`
+      booking_id,
+      booking_date,
+      start_time,
+      end_time,
+      booking_status
+    `)
+    .eq("booking_id",bookingId)
+    .eq("customer_id",state.user.id)
+    .maybeSingle();
+
+  if(error){
+    alert(error.message);
     return;
   }
 
-  const {error}=await sb
+  if(!booking){
+    alert("الحجز غير موجود");
+    return;
+  }
+
+  if(booking.booking_status !== "Confirmed"){
+    alert("لا يمكن إلغاء هذا الحجز");
+    return;
+  }
+
+  const endDateTime = new Date(
+    booking.booking_date + "T" + booking.end_time
+  );
+
+  if(endDateTime <= new Date()){
+    alert("لا يمكن إلغاء حجز انتهى وقته");
+    return;
+  }
+
+  if(!confirm("هل أنت متأكد من إلغاء الحجز؟")){
+    return;
+  }
+
+  const {error:updateError}=await sb
     .from("bookings")
     .update({
       booking_status:"Cancelled"
@@ -2559,8 +2637,8 @@ async function cancelMyBooking(bookingId){
     .eq("customer_id",state.user.id)
     .eq("booking_status","Confirmed");
 
-  if(error){
-    alert(error.message);
+  if(updateError){
+    alert(updateError.message);
     return;
   }
 
